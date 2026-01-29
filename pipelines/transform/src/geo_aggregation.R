@@ -13,14 +13,14 @@ geo_aggregation <- function() {
 
   # Load and simplify districts with rmapshaper (better topology preservation)
   districts <- st_read(here("pipelines", "ingest", "input", "geo", "districts-electoraux-2021.geojson"), quiet = TRUE) |>
-    ms_simplify(keep = 0.05, keep_shapes = TRUE) |>
+    ms_simplify(keep = 0.15, keep_shapes = TRUE) |>
     mutate(layer = "districts")
 
   # Load CMA boundary, filter to Montreal, transform to WGS84, simplify
   boundary <- st_read(here("pipelines", "ingest", "input", "geo", "cma_boundary_file_census", "lcma000b21a_e.shp"), quiet = TRUE) |>
     filter(DGUID == "2021S0503462") |>
     st_transform(crs = 4326) |>
-    ms_simplify(keep = 0.05, keep_shapes = TRUE) |>
+    ms_simplify(keep = 0.15, keep_shapes = TRUE) |>
     mutate(layer = "boundary")
 
   # Combine and write TopoJSON
