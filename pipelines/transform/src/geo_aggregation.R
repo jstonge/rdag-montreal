@@ -29,7 +29,7 @@ geo_aggregation <- function() {
   )
 
   output_path <- here("pipelines", "transform", "input", "montreal.topojson")
-  topojson_write(combined, file = output_path)
+  topojson_write(combined, file = output_path, object_name = "data")
 
   message(sprintf("Wrote %d districts + %d boundary features to %s",
                   nrow(districts), nrow(boundary), output_path))
