@@ -54,4 +54,3 @@ rsconnect/
 # raw data input directory
 
 pipelines/ingest/input/
-pipelines/transform/tests/test_geo_aggregation.R
