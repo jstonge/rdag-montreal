@@ -10,24 +10,18 @@ source(here::here("pipelines", "transform", "src", "metadata_aggregation.R"))
 # =============================================================================
 
 #' Ingest electoral districts
-#' @maestroFrequency 1 day
-#' @maestroStartTime 2026-01-29
 #' @maestroOutputs transform_geo
 ingest_districts <- function() {
   districts_electoraux_2021()
 }
 
 #' Ingest Montreal CMA boundary
-#' @maestroFrequency 1 day
-#' @maestroStartTime 2026-01-29
 #' @maestroOutputs transform_geo
 ingest_cma <- function() {
   montreal_cma()
 }
 
 #' Ingest population data
-#' @maestroFrequency 1 day
-#' @maestroStartTime 2026-01-29
 #' @maestroOutputs transform_metadata
 ingest_population <- function() {
   # Population data is downloaded via Excel sheets in ingest.R
