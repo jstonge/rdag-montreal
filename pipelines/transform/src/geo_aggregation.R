@@ -1,15 +1,16 @@
 # Geo aggregation - combine geo layers into TopoJSON
+library(sf)
+library(dplyr)
+library(here)
+library(fs)
+library(geojsonio)
+library(rmapshaper)
+
+transform_dir <- here("pipelines", "transform", "input")
+dir_create(transform_dir, recurse = TRUE)
 
 geo_aggregation <- function() {
-  library(sf)
-  library(dplyr)
-  library(here)
-  library(fs)
-  library(geojsonio)
-  library(rmapshaper)
 
-  transform_dir <- here("pipelines", "transform", "input")
-  dir_create(transform_dir, recurse = TRUE)
 
   # Load and simplify districts with rmapshaper (better topology preservation)
   districts <- st_read(here("pipelines", "ingest", "input", "geo", "districts-electoraux-2021.geojson"), quiet = TRUE) |>
@@ -31,6 +32,11 @@ geo_aggregation <- function() {
 
   output_path <- here("pipelines", "transform", "input", "montreal.topojson")
   topojson_write(combined, file = output_path, object_name = "data", quantization = 1e4)
+
+  # Post-process to fix R's "NA" strings to proper JSON null
+  json_text <- readLines(output_path, warn = FALSE)
+  json_text <- gsub('"NA"', 'null', json_text)
+  writeLines(json_text, output_path)
 
   message(sprintf("Wrote %d districts + %d boundary features to %s",
                   nrow(districts), nrow(boundary), output_path))
