@@ -10,7 +10,7 @@ geo_aggregation <- function() {
 
   # Load and simplify districts with rmapshaper (better topology preservation)
   districts <- sf::st_read(here("pipelines", "ingest", "input", "geo", "districts-electoraux-2021.geojson"), quiet = TRUE) |>
-    rmapshaper::ms_simplify(keep = 0.15, keep_shapes = TRUE)
+    rmapshaper::ms_simplify(keep = 0.05, keep_shapes = TRUE)
 
   # Load CMA boundary, filter to Montreal, transform to WGS84, simplify aggressively
   boundary <- sf::st_read(here("pipelines", "ingest", "input", "geo", "cma_boundary_file_census", "lcma000b21a_e.shp"), quiet = TRUE) |>
