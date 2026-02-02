@@ -1,12 +1,7 @@
-# Geo aggregation - write geo layers as GeoParquet
-library(sf)
+# Geo aggregation - write geo layers as GeoJSON
 library(dplyr)
 library(here)
 library(fs)
-library(rmapshaper)
-library(lwgeom)
-library(geoarrow)
-library(arrow)
 
 transform_dir <- here("pipelines", "transform", "input")
 dir_create(transform_dir, recurse = TRUE)
@@ -14,29 +9,21 @@ dir_create(transform_dir, recurse = TRUE)
 geo_aggregation <- function() {
 
   # Load and simplify districts with rmapshaper (better topology preservation)
-  # st_force_polygon_cw() ensures clockwise exterior rings for D3 spherical projections
-  districts <- st_read(here("pipelines", "ingest", "input", "geo", "districts-electoraux-2021.geojson"), quiet = TRUE) |>
-    ms_simplify(keep = 0.15, keep_shapes = TRUE) |>
-    st_force_polygon_cw()
+  districts <- sf::st_read(here("pipelines", "ingest", "input", "geo", "districts-electoraux-2021.geojson"), quiet = TRUE) |>
+    rmapshaper::ms_simplify(keep = 0.15, keep_shapes = TRUE)
 
   # Load CMA boundary, filter to Montreal, transform to WGS84, simplify
-  boundary <- st_read(here("pipelines", "ingest", "input", "geo", "cma_boundary_file_census", "lcma000b21a_e.shp"), quiet = TRUE) |>
+  boundary <- sf::st_read(here("pipelines", "ingest", "input", "geo", "cma_boundary_file_census", "lcma000b21a_e.shp"), quiet = TRUE) |>
     filter(DGUID == "2021S0503462") |>
-    st_transform(crs = 4326) |>
-    ms_simplify(keep = 0.15, keep_shapes = TRUE) |>
-    st_force_polygon_cw()
+    sf::st_transform(crs = 4326) |>
+    rmapshaper::ms_simplify(keep = 0.15, keep_shapes = TRUE)
 
-  # Write as separate GeoParquet files
-  districts_path <- here("pipelines", "transform", "input", "districts.parquet")
-  boundary_path <- here("pipelines", "transform", "input", "boundary.parquet")
+  # Write as GeoJSON files (winding order fixed on frontend with @turf/rewind)
+  districts_path <- here("pipelines", "transform", "input", "districts.geojson")
+  boundary_path <- here("pipelines", "transform", "input", "boundary.geojson")
 
-  districts |>
-    tibble::as_tibble() |>
-    write_parquet(districts_path)
-
-  boundary |>
-    tibble::as_tibble() |>
-    write_parquet(boundary_path)
+  sf::st_write(districts, districts_path, delete_dsn = TRUE, quiet = TRUE)
+  sf::st_write(boundary, boundary_path, delete_dsn = TRUE, quiet = TRUE)
 
   message(sprintf("Wrote %d districts to %s", nrow(districts), districts_path))
   message(sprintf("Wrote %d boundary features to %s", nrow(boundary), boundary_path))
