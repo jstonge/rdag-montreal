@@ -16,7 +16,7 @@ geo_aggregation <- function() {
   boundary <- sf::st_read(here("pipelines", "ingest", "input", "geo", "cma_boundary_file_census", "lcma000b21a_e.shp"), quiet = TRUE) |>
     filter(DGUID == "2021S0503462") |>
     sf::st_transform(crs = 4326) |>
-    rmapshaper::ms_simplify(keep = 0.005, keep_shapes = TRUE)
+    rmapshaper::ms_simplify(keep = 0.05, keep_shapes = TRUE)
 
   # Write as GeoJSON files (winding order fixed on frontend with @turf/rewind)
   districts_path <- here("pipelines", "transform", "input", "districts.geojson")
