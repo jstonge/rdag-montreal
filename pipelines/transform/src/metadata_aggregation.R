@@ -1,4 +1,12 @@
 # Metadata aggregation - combine population data across census years
+library(dplyr)
+library(readr)
+library(here)
+library(fs)
+
+output_dir <- here("pipelines", "transform", "input")
+dir_create(output_dir, recurse = TRUE)
+
 
 normalize_name <- function(name) {
   name |>
@@ -6,13 +14,8 @@ normalize_name <- function(name) {
     stringr::str_replace_all("'", "'")
 }
 
-wrangle_2011_2016 <- function(year) {
-  library(dplyr)
-  library(readr)
-  library(here)
-
-  filepath <- here("pipelines", "ingest", "input", "metadata", "population", year, "population_mtl_by_district.csv")
-
+wrangle_2011_2016 <- function(input_dir, metadata_layer, year, fname) {
+  file_path <- here(input_dir, metadata_layer, year, fname)
   # Column name pattern: "Population en 2011" or similar
   pop_col <- paste0("Population en ", year)
 
@@ -31,22 +34,22 @@ wrangle_2011_2016 <- function(year) {
 }
 
 metadata_aggregation <- function() {
-  library(dplyr)
-  library(readr)
-  library(here)
-  library(fs)
 
-  transform_dir <- here("pipelines", "transform", "input")
-  dir_create(transform_dir, recurse = TRUE)
+  # Population layer
+  input_dir <- here("pipelines", "ingest", "input", "metadata")
+  metadata_layer <- "population"
+  fname <- "population_mtl_by_district.csv"
 
-  df_2011 <- wrangle_2011_2016("2011")
-  df_2016 <- wrangle_2011_2016("2016")
+  df_2011 <- wrangle_2011_2016(input_dir, metadata_layer, "2011", fname)
+  df_2016 <- wrangle_2011_2016(input_dir, metadata_layer, "2016", fname)
 
-  df <- bind_rows(df_2011, df_2016)
+  df_pop <- bind_rows(df_2011, df_2016)
 
-  output_path <- here("pipelines", "transform", "input", "metadata.csv")
-  write_csv(df, output_path)
+  # OUTPUT
+  output_dir <- here("pipelines", "transform", "input")
+  fout <- "metadata.csv"
+  write_csv(df_pop, here(output_path, fout))
 
   message(sprintf("Wrote %d rows to %s", nrow(df), output_path))
-  output_path
+  here(output_dir, fout)
 }

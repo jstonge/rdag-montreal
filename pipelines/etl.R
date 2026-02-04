@@ -26,7 +26,7 @@ ingest_cma <- function() {
 ingest_population <- function() {
   # Population data is downloaded via Excel sheets in ingest.R
   # For now this is a placeholder - add population_by_district() when ready
-  message("Population data ready")
+  population_by_district()
 }
 
 # =============================================================================

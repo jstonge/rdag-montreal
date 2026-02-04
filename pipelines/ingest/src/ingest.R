@@ -109,3 +109,52 @@ montreal_adm_boundaries <- function(force = FALSE) {
     force = force
   )
 }
+
+# Population metadata sources
+POPULATION_SOURCES <- list(
+  list(
+    year = "2021",
+    url = "https://ville.montreal.qc.ca/pls/portal/docs/PAGE/MTL_STATS_FR/MEDIA/DOCUMENTS/DONN%C9ES%20DU%20RECENSEMENT%20DE%202021_AGGLOM%C9RATION%20DE%20MONTR%C9AL_TOTAUX%20ET%20POURCENTAGES_0.XLSX",
+    sheet_name = "Recensement2021_Totaux et %",
+    filename = "population_mtl_by_district.csv"
+  ),
+  list(
+    year = "2016",
+    url = "http://ville.montreal.qc.ca/pls/portal/url/ITEM/55637C4923B8B03EE0530A930132B03E",
+    sheet_name = "01_Population, Densité",
+    filename = "population_mtl_by_district.csv"
+  ),
+  list(
+    year = "2011",
+    url = "http://ville.montreal.qc.ca/pls/portal/url/ITEM/55637C4923B8B03EE0530A930132B03E",
+    sheet_name = "01_Population, Densité",
+    filename = "population_mtl_by_district.csv"
+  ),
+  list(
+    year = "2006",
+    url = "https://donnees.montreal.ca/dataset/ca61c35d-9963-4f62-b963-073aa284e3bd/resource/d809ba17-a8f8-4405-8b79-a70815a25085/download/annuaire-statistique-2006-agglo-mtlenstats.xls",
+    sheet_name = "01_Population_SR",
+    filename = "population_mtl_by_district.csv"
+  ),
+  list(
+    year = "2001",
+    url = "http://ville.montreal.qc.ca/pls/portal/url/ITEM/085DF59B4B35D07CE0430A930132D07C",
+    sheet_name = NULL,
+    filename = "population_mtl_by_district.pdf"
+  )
+)
+
+population_by_district <- function(force = FALSE) {
+  paths <- c()
+  for (src in POPULATION_SOURCES) {
+    path <- download_file(
+      url = src$url,
+      output_path = here("pipelines", "ingest", "input", "metadata", "population", src$year),
+      filename = src$filename,
+      sheet_name = src$sheet_name,
+      force = force
+    )
+    paths <- c(paths, path)
+  }
+  return(paths)
+}

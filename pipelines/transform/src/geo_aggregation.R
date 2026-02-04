@@ -3,8 +3,8 @@ library(dplyr)
 library(here)
 library(fs)
 
-transform_dir <- here("pipelines", "transform", "input")
-dir_create(transform_dir, recurse = TRUE)
+output_dir <- here("pipelines", "transform", "input")
+dir_create(output_dir, recurse = TRUE)
 
 geo_aggregation <- function() {
 
