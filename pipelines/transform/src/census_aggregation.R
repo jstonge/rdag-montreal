@@ -1,5 +1,6 @@
 # Census aggregation - pull demographic data from cancensus API
-# Combines geometry + attributes for Montreal Dissemination Areas (2021 Census)
+# Combines geometry + attributes for Montreal (2021 Census)
+# Outputs both DA (Dissemination Area) and CT (Census Tract) levels
 library(cancensus)
 library(dplyr)
 library(here)
@@ -27,23 +28,33 @@ CENSUS_VECTORS <- c(
   "v_CA21_4404"  # Immigrants
 )
 
-census_aggregation <- function() {
-  output_dir <- here("pipelines", "transform", "input")
-  dir_create(output_dir, recurse = TRUE)
-
-  census_da <- get_census(
+fetch_census_level <- function(level) {
+  get_census(
     dataset = "CA21",
     regions = list(CSD = "2466023"),
     vectors = CENSUS_VECTORS,
-    level = "DA",
+    level = level,
     geo_format = "sf"
   ) |>
     sf::st_transform(crs = 4326) |>
     rmapshaper::ms_simplify(keep = 0.05, keep_shapes = TRUE)
+}
 
-  output_path <- here("pipelines", "transform", "input", "census_da.geojson")
-  sf::st_write(census_da, output_path, delete_dsn = TRUE, quiet = TRUE)
+census_aggregation <- function() {
+  output_dir <- here("pipelines", "transform", "input")
+  dir_create(output_dir, recurse = TRUE)
 
-  message(sprintf("Wrote %d DAs to %s", nrow(census_da), output_path))
-  output_path
+  # Dissemination Areas
+  census_da <- fetch_census_level("DA")
+  da_path <- here("pipelines", "transform", "input", "census_da.geojson")
+  sf::st_write(census_da, da_path, delete_dsn = TRUE, quiet = TRUE)
+  message(sprintf("Wrote %d DAs to %s", nrow(census_da), da_path))
+
+  # Census Tracts
+  census_ct <- fetch_census_level("CT")
+  ct_path <- here("pipelines", "transform", "input", "census_ct.geojson")
+  sf::st_write(census_ct, ct_path, delete_dsn = TRUE, quiet = TRUE)
+  message(sprintf("Wrote %d CTs to %s", nrow(census_ct), ct_path))
+
+  list(da = da_path, ct = ct_path)
 }
