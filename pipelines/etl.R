@@ -4,6 +4,7 @@
 source(here::here("pipelines", "ingest", "src", "ingest.R"))
 source(here::here("pipelines", "transform", "src", "geo_aggregation.R"))
 source(here::here("pipelines", "transform", "src", "metadata_aggregation.R"))
+source(here::here("pipelines", "transform", "src", "census_aggregation.R"))
 
 # =============================================================================
 # INGEST PIPELINES
@@ -43,4 +44,16 @@ transform_geo <- function(.input) {
 #' @maestroInputs ingest_population
 transform_metadata <- function(.input) {
   metadata_aggregation()
+}
+
+#' Ingest census data (cancensus handles caching via API)
+#' @maestroOutputs transform_census
+ingest_census <- function() {
+  TRUE
+}
+
+#' Transform census data at DA level
+#' @maestroInputs ingest_census
+transform_census <- function(.input) {
+  census_aggregation()
 }

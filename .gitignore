@@ -54,3 +54,5 @@ rsconnect/
 # raw data input directory
 
 pipelines/ingest/input/
+pipelines/transform/tests/test-census_aggregation.R
+notebooks/01_boundary_file_census_2021.qmd

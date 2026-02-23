@@ -19,7 +19,7 @@ wrangle_2011_2016 <- function(input_dir, metadata_layer, year, fname) {
   # Column name pattern: "Population en 2011" or similar
   pop_col <- paste0("Population en ", year)
 
-  df <- read_csv(filepath, skip = 2, show_col_types = FALSE) |>
+  df <- read_csv(file_path, skip = 2, show_col_types = FALSE) |>
     slice(1:(n() - 4)) |>
     rename(arrondissement = 1) |>
     select(arrondissement, population = any_of(pop_col)) |>
@@ -43,13 +43,12 @@ metadata_aggregation <- function() {
   df_2011 <- wrangle_2011_2016(input_dir, metadata_layer, "2011", fname)
   df_2016 <- wrangle_2011_2016(input_dir, metadata_layer, "2016", fname)
 
-  df_pop <- bind_rows(df_2011, df_2016)
+  df <- bind_rows(df_2011, df_2016)
 
   # OUTPUT
-  output_dir <- here("pipelines", "transform", "input")
-  fout <- "metadata.csv"
-  write_csv(df_pop, here(output_path, fout))
+  output_path <- here("pipelines", "transform", "input", "metadata.csv")
+  write_csv(df, output_path)
 
   message(sprintf("Wrote %d rows to %s", nrow(df), output_path))
-  here(output_dir, fout)
+  output_path
 }
