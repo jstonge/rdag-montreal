@@ -3,8 +3,6 @@
 # Outputs both DA (Dissemination Area) and CT (Census Tract) levels
 library(cancensus)
 library(dplyr)
-library(geoarrow)
-library(arrow, warn.conflicts = FALSE)
 library(here)
 library(fs)
 
@@ -108,14 +106,13 @@ write_census_outputs <- function(data, level_label) {
   output_dir <- here("pipelines", "transform", "input")
   dir_create(output_dir, recurse = TRUE)
 
-  parquet_path <- file.path(output_dir, paste0("census_", level_label, ".parquet"))
+  geojson_path <- file.path(output_dir, paste0("census_", level_label, ".geojson"))
   data |>
     filter(population > 0) |>
-    tibble::as_tibble() |>
-    write_parquet(parquet_path)
-  message(sprintf("Wrote %d %ss to %s", nrow(data), toupper(level_label), parquet_path))
+    sf::st_write(geojson_path, delete_dsn = TRUE, quiet = TRUE)
+  message(sprintf("Wrote %d %ss to %s", nrow(data), toupper(level_label), geojson_path))
 
-  parquet_path
+  geojson_path
 }
 
 census_aggregation <- function() {

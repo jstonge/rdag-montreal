@@ -52,8 +52,18 @@ ingest_census <- function() {
   TRUE
 }
 
-#' Transform census data at DA level
+#' Transform census data at DA and CT level
 #' @maestroInputs ingest_census
 transform_census <- function(.input) {
   census_aggregation()
+}
+
+# =============================================================================
+# LOAD PIPELINES
+# =============================================================================
+
+#' Convert census GeoJSON to spatial Parquet via DuckDB
+#' @maestroInputs transform_census
+load_census <- function(.input) {
+  system2("bash", here::here("pipelines", "load", "src", "census_to_parquet.sh"))
 }
