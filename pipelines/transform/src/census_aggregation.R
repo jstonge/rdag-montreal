@@ -111,6 +111,7 @@ write_census_outputs <- function(data, level_label) {
   parquet_path <- file.path(output_dir, paste0("census_", level_label, ".parquet"))
   data |>
     filter(population > 0) |>
+    tibble::as_tibble() |>
     write_parquet(parquet_path)
   message(sprintf("Wrote %d %ss to %s", nrow(data), toupper(level_label), parquet_path))
 
