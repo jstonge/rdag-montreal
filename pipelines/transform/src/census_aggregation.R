@@ -22,9 +22,9 @@ CENSUS_VECTORS <- c(
   ## median
   "median_income_household"                 = "v_CA21_906",
   "median_income_aftertax_household"        = "v_CA21_910",
-  "median_income_total"   = "v_CA21_986",
-  "median_income_male"    = "v_CA21_987",
-  "median_income_female"  = "v_CA21_988",
+  "median_income_total"   = "v_CA21_983",
+  "median_income_male"    = "v_CA21_984",
+  "median_income_female"  = "v_CA21_985",
   "median_income_aftertax_total"   = "v_CA21_986",
   "median_income_aftertax_male"    = "v_CA21_987",
   "median_income_aftertax_female"  = "v_CA21_988",
