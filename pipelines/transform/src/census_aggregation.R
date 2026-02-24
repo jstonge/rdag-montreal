@@ -18,10 +18,21 @@ CENSUS_VECTORS <- c(
   "pop_age_65plus"                 = "v_CA21_254",
   "avg_age_sex_total"              = "v_CA21_386",
   # Income
-  "median_income_household"        = "v_CA21_906",
+
+  ## median
+  "median_income_household"                 = "v_CA21_906",
+  "median_income_aftertax_household"        = "v_CA21_910",
+  "median_income_total"   = "v_CA21_986",
+  "median_income_male"    = "v_CA21_987",
+  "median_income_female"  = "v_CA21_988",
   "median_income_aftertax_total"   = "v_CA21_986",
   "median_income_aftertax_male"    = "v_CA21_987",
   "median_income_aftertax_female"  = "v_CA21_988",
+  
+  ## average
+  "avg_total_income_total"   = "v_CA21_1004",
+  "avg_total_income_male"    = "v_CA21_1005",
+  "avg_total_income_female"  = "v_CA21_1006",
   # Housing
   "dwellings_total"                = "v_CA21_4",
   "tenure_owner"                   = "v_CA21_4239",

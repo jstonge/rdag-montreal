@@ -2,7 +2,7 @@ library(maestro)
 
 schedule <- build_schedule(pipeline_dir = "pipelines")
 
-show_network(schedule)
+# show_network(schedule)
 
 status <- run_schedule(schedule)
 
