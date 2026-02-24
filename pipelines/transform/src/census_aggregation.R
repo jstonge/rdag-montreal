@@ -11,17 +11,25 @@ library(fs)
 CENSUS_VECTORS <- c(
   # Population
   "v_CA21_1",    # Population, 2021
+  
   # Age
   "v_CA21_8",    # 0-14 years
   "v_CA21_251",  # 15-64 years
   "v_CA21_254",  # 65+ years
   "v_CA21_386",  # Median age
+  
   # Income
-  "v_CA21_906",  # Median total income
+  "v_CA21_906",  # Median total income of household in 2020 ($)
+
+  "v_CA21_986",  # Median after-tax income in 2020 ($) - Total
+  "v_CA21_987",  # Median after-tax income in 2020 ($) - Male
+  "v_CA21_988",  # Median after-tax income in 2020 ($) - Female
+  
   # Housing
   "v_CA21_4",    # Total private dwellings
   "v_CA21_4239", # Owner
   "v_CA21_4240", # Renter
+  
   # Language & immigration
   "v_CA21_1144", # English mother tongue
   "v_CA21_1147", # French mother tongue
