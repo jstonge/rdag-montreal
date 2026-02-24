@@ -3,7 +3,8 @@
 # Outputs both DA (Dissemination Area) and CT (Census Tract) levels
 library(cancensus)
 library(dplyr)
-library(arrow)
+library(geoarrow)
+library(arrow, warn.conflicts = FALSE)
 library(here)
 library(fs)
 
@@ -109,7 +110,6 @@ write_census_outputs <- function(data, level_label) {
 
   parquet_path <- file.path(output_dir, paste0("census_", level_label, ".parquet"))
   data |>
-    sf::st_drop_geometry() |>
     filter(population > 0) |>
     write_parquet(parquet_path)
   message(sprintf("Wrote %d %ss to %s", nrow(data), toupper(level_label), parquet_path))
