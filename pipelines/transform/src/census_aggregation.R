@@ -30,6 +30,8 @@ CENSUS_VECTORS <- c(
   "median_income_aftertax_female"  = "v_CA21_988",
   
   ## average
+  "avg_income_household"   = "v_CA21_915",
+  "avg_income_aftertax_household"   = "v_CA21_916",
   "avg_total_income_total"   = "v_CA21_1004",
   "avg_total_income_male"    = "v_CA21_1005",
   "avg_total_income_female"  = "v_CA21_1006",
