@@ -8,42 +8,55 @@ library(fs)
 
 # Census vectors to pull — confirm IDs with:
 #   find_census_vectors("topic", dataset = "CA21", query_type = "semantic")
+# Convention: {metric}_{dimension}_{value}
 CENSUS_VECTORS <- c(
   # Population
-  "v_CA21_1",    # Population, 2021
-  
+  "pop_total"                      = "v_CA21_1",
   # Age
-  "v_CA21_8",    # 0-14 years
-  "v_CA21_251",  # 15-64 years
-  "v_CA21_254",  # 65+ years
-  "v_CA21_386",  # Median age
-  
+  "pop_age_0to14"                  = "v_CA21_8",
+  "pop_age_15to64"                 = "v_CA21_251",
+  "pop_age_65plus"                 = "v_CA21_254",
+  "avg_age_sex_total"              = "v_CA21_386",
   # Income
-  "v_CA21_906",  # Median total income of household in 2020 ($)
-
-  "v_CA21_986",  # Median after-tax income in 2020 ($) - Total
-  "v_CA21_987",  # Median after-tax income in 2020 ($) - Male
-  "v_CA21_988",  # Median after-tax income in 2020 ($) - Female
-  
+  "median_income_household"        = "v_CA21_906",
+  "median_income_aftertax_total"   = "v_CA21_986",
+  "median_income_aftertax_male"    = "v_CA21_987",
+  "median_income_aftertax_female"  = "v_CA21_988",
   # Housing
-  "v_CA21_4",    # Total private dwellings
-  "v_CA21_4239", # Owner
-  "v_CA21_4240", # Renter
-  
-  # Language & immigration
-  "v_CA21_1144", # English mother tongue
-  "v_CA21_1147", # French mother tongue
-  "v_CA21_4404"  # Immigrants
+  "dwellings_total"                = "v_CA21_4",
+  "tenure_owner"                   = "v_CA21_4239",
+  "tenure_renter"                  = "v_CA21_4240",
+  # Language
+  "lang_mother_english"            = "v_CA21_1144",
+  "lang_mother_french"             = "v_CA21_1147",
+  # Immigration
+  "pop_immigrant"                  = "v_CA21_4404"
 )
+
+# Rename cancensus columns (e.g. "v_CA21_986: Some label") to clean convention names
+rename_census_columns <- function(df) {
+  col_names <- names(df)
+  for (i in seq_along(CENSUS_VECTORS)) {
+    vec_id <- CENSUS_VECTORS[i]
+    clean_name <- names(CENSUS_VECTORS)[i]
+    match_idx <- grep(paste0("^", vec_id, ":"), col_names)
+    if (length(match_idx) == 1) {
+      col_names[match_idx] <- clean_name
+    }
+  }
+  names(df) <- col_names
+  df
+}
 
 fetch_census_level <- function(level) {
   get_census(
     dataset = "CA21",
     regions = list(CSD = "2466023"),
-    vectors = CENSUS_VECTORS,
+    vectors = unname(CENSUS_VECTORS),
     level = level,
     geo_format = "sf"
   ) |>
+    rename_census_columns() |>
     sf::st_transform(crs = 4326) |>
     rmapshaper::ms_simplify(keep = 0.05, keep_shapes = TRUE)
 }
