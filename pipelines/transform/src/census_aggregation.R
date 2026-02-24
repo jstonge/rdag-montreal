@@ -3,6 +3,7 @@
 # Outputs both DA (Dissemination Area) and CT (Census Tract) levels
 library(cancensus)
 library(dplyr)
+library(arrow)
 library(here)
 library(fs)
 
@@ -61,6 +62,33 @@ rename_census_columns <- function(df) {
   df
 }
 
+# Rename default cancensus columns to snake_case
+COLUMN_RENAMES <- c(
+  "GeoUID"      = "geo_uid",
+  "Type"        = "type",
+  "Region Name" = "region_name",
+  "Area (sq km)" = "area_sqkm",
+  "Population"  = "population",
+  "Dwellings"   = "dwellings",
+  "Households"  = "households",
+  "CSD_UID"     = "csd_uid",
+  "CD_UID"      = "cd_uid",
+  "CT_UID"      = "ct_uid",
+  "CMA_UID"     = "cma_uid"
+)
+
+rename_default_columns <- function(df) {
+  col_names <- names(df)
+  for (old_name in names(COLUMN_RENAMES)) {
+    idx <- match(old_name, col_names)
+    if (!is.na(idx)) {
+      col_names[idx] <- COLUMN_RENAMES[old_name]
+    }
+  }
+  names(df) <- col_names
+  df
+}
+
 fetch_census_level <- function(level) {
   get_census(
     dataset = "CA21",
@@ -70,25 +98,27 @@ fetch_census_level <- function(level) {
     geo_format = "sf"
   ) |>
     rename_census_columns() |>
+    rename_default_columns() |>
     sf::st_transform(crs = 4326) |>
     rmapshaper::ms_simplify(keep = 0.05, keep_shapes = TRUE)
 }
 
-census_aggregation <- function() {
+write_census_outputs <- function(data, level_label) {
   output_dir <- here("pipelines", "transform", "input")
   dir_create(output_dir, recurse = TRUE)
 
-  # Dissemination Areas
-  census_da <- fetch_census_level("DA")
-  da_path <- here("pipelines", "transform", "input", "census_da.geojson")
-  sf::st_write(census_da, da_path, delete_dsn = TRUE, quiet = TRUE)
-  message(sprintf("Wrote %d DAs to %s", nrow(census_da), da_path))
+  parquet_path <- file.path(output_dir, paste0("census_", level_label, ".parquet"))
+  data |>
+    sf::st_drop_geometry() |>
+    filter(population > 0) |>
+    write_parquet(parquet_path)
+  message(sprintf("Wrote %d %ss to %s", nrow(data), toupper(level_label), parquet_path))
 
-  # Census Tracts
-  census_ct <- fetch_census_level("CT")
-  ct_path <- here("pipelines", "transform", "input", "census_ct.geojson")
-  sf::st_write(census_ct, ct_path, delete_dsn = TRUE, quiet = TRUE)
-  message(sprintf("Wrote %d CTs to %s", nrow(census_ct), ct_path))
+  parquet_path
+}
 
-  list(da = da_path, ct = ct_path)
+census_aggregation <- function() {
+  da_paths <- write_census_outputs(fetch_census_level("DA"), "da")
+  ct_paths <- write_census_outputs(fetch_census_level("CT"), "ct")
+  list(da = da_paths, ct = ct_paths)
 }
