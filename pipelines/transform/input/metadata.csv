@@ -1,4 +1,121 @@
 arrondissement,population,year
+Anjou,37210,1991
+Baie-d'Urfé,3849,1991
+Beaconsfield,19616,1991
+Côte-Saint-Luc,28700,1991
+Dollard-des-Ormeaux,46922,1991
+Dorval,17249,1991
+Hampstead,8645,1991
+Kirkland,17495,1991
+LaSalle,73804,1991
+Lachine,35266,1991
+Mont-Royal,18212,1991
+Montréal-Est,3767,1991
+Montréal-Nord,85516,1991
+Montréal-Ouest,5180,1991
+Montréal,1017666,1991
+Outremont,22935,1991
+Pierrefonds,48735,1991
+Pointe-Claire,27647,1991
+Roxboro,5879,1991
+Saint-Laurent,72402,1991
+Saint-Léonard,73120,1991
+Saint-Pierre,4967,1991
+Saint-Raphaël-de-l'Île-Bizard,11352,1991
+Sainte-Anne-de-Bellevue,4030,1991
+Sainte-Geneviève,3197,1991
+Senneville,961,1991
+Verdun,61307,1991
+Westmount,20239,1991
+Anjou,37308,1996
+Baie-d'Urfé,3774,1996
+Beaconsfield,19414,1996
+Côte-Saint-Luc,29705,1996
+Dollard-des-Ormeaux,47826,1996
+Dorval,17572,1996
+Hampstead,6986,1996
+Kirkland,18678,1996
+L'Île-Bizard,13038,1996
+LaSalle,72029,1996
+Lachine,35171,1996
+Mont-Royal,18282,1996
+Montréal-Est,3523,1996
+Montréal-Nord,81581,1996
+Montréal-Ouest,5254,1996
+Montréal,1016376,1996
+Outremont,22571,1996
+Pierrefonds,52986,1996
+Pointe-Claire,28435,1996
+Roxboro,5950,1996
+Saint-Laurent,74240,1996
+Saint-Léonard,71327,1996
+Saint-Pierre,4739,1996
+Sainte-Anne-de-Bellevue,4700,1996
+Sainte-Geneviève,3339,1996
+Senneville,906,1996
+Verdun,59714,1996
+Westmount,20420,1996
+Côte-des-Neiges - Notre-Dame-de-Grâce,163110,2001
+Villeray - Saint-Michel - Parc-Extension,145485,2001
+Rosemont - Petite-Patrie,131318,2001
+Mercier - Hochelaga-Maisonneuve,128440,2001
+Ahuntsic - Cartierville,125145,2001
+Rivière-des-Prairies - Pointe-aux-Trembles - Montréal-Est,106004,2001
+Plateau Mont-Royal,101364,2001
+Montréal-Nord,83600,2001
+St-Laurent,77391,2001
+Ville-Marie,74832,2001
+LaSalle,73983,2001
+St-Léonard,69604,2001
+Sud-Ouest,66474,2001
+Verdun,60564,2001
+Pierrefonds - Senneville,55933,2001
+Dollard-des-Ormeaux - Roxboro,53848,2001
+Côte-St-Luc - Hampstead - Montréal-Ouest,41580,2001
+Lachine,40222,2001
+Anjou,38015,2001
+Pointe-Claire,29286,2001
+Beaconsfield - Baie d'Urfé,23123,2001
+Outremont,22933,2001
+L'Île-Bizard - Sainte-Geneviève - Sainte-Anne-de-Bellevue,22201,2001
+Kirkland,20434,2001
+Mont-Royal,20361,2001
+Westmount,19727,2001
+Dorval - L'Île-Dorval,17706,2001
+Ahuntsic-Cartierville,126607,2006
+Anjou,40891,2006
+Côte-des-Neiges-Notre-Dame-de-Grâce,164246,2006
+Lachine,41391,2006
+LaSalle,74763,2006
+Le Plateau-Mont-Royal,101054,2006
+Le Sud-Ouest,69860,2006
+L'Île-Bizard-Sainte-Geneviève,17590,2006
+Mercier-Hochelaga-Maisonneuve,129110,2006
+Montréal-Nord,83911,2006
+Outremont,22897,2006
+Pierrefonds-Roxboro,65041,2006
+Rivière-des-Prairies-Pointe-aux-Trembles,105372,2006
+Rosemont-La Petite-Patrie,133618,2006
+Saint-Laurent,84833,2006
+Saint-Léonard,71730,2006
+Verdun,66078,2006
+Ville-Marie,78876,2006
+Villeray-Saint-Michel-Parc-Extension,142825,2006
+Baie-D'Urfé,3902,2006
+Beaconsfield,19194,2006
+Côte-Saint-Luc,31395,2006
+Dollard-Des Ormeaux,48930,2006
+Dorval,18088,2006
+Hampstead,6996,2006
+Kirkland,20491,2006
+L'Île-Dorval,NA,2006
+Montréal-Est,3822,2006
+Montréal-Ouest,5184,2006
+Mont-Royal,18933,2006
+Pointe-Claire,30161,2006
+Sainte-Anne-de-Bellevue,5197,2006
+Senneville,962,2006
+Westmount,20494,2006
 Ahuntsic-Cartierville,126891,2011
 Anjou,41928,2011
 Côte-des-Neiges-Notre-Dame-de-Grâce,165031,2011
@@ -67,3 +184,36 @@ Pointe-Claire,31380,2016
 Sainte-Anne-de-Bellevue,4958,2016
 Senneville,921,2016
 Westmount,20312,2016
+Ahuntsic-Cartierville,135336,2021
+Anjou,43243,2021
+Côte-des-Neiges-Notre-Dame-de-Grâce,170583,2021
+Lachine,46428,2021
+LaSalle,82235,2021
+Le Plateau-Mont-Royal,105813,2021
+Le Sud-Ouest,84553,2021
+L'Île-Bizard-Sainte-Geneviève,18885,2021
+Mercier-Hochelaga-Maisonneuve,140627,2021
+Montréal-Nord,88471,2021
+Outremont,24629,2021
+Pierrefonds-Roxboro,70382,2021
+Rivière-des-Prairies-Pointe-aux-Trembles,107941,2021
+Rosemont-La Petite-Patrie,141813,2021
+Saint-Laurent,102104,2021
+Saint-Léonard,79495,2021
+Verdun,70377,2021
+Ville-Marie,104944,2021
+Villeray-Saint-Michel-Parc-Extension,145090,2021
+Baie-D'Urfé,3764,2021
+Beaconsfield,19277,2021
+Côte-Saint-Luc,34504,2021
+Dollard-Des Ormeaux,48403,2021
+Dorval,19302,2021
+Hampstead,7037,2021
+Kirkland,19413,2021
+Montréal-Est,4394,2021
+Montréal-Ouest,5115,2021
+Mont-Royal,20953,2021
+Pointe-Claire,33488,2021
+Sainte-Anne-de-Bellevue,5027,2021
+Senneville,951,2021
+Westmount,19658,2021
