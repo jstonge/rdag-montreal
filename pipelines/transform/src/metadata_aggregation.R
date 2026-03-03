@@ -7,31 +7,13 @@ library(fs)
 output_dir <- here("pipelines", "transform", "input")
 dir_create(output_dir, recurse = TRUE)
 
-
-normalize_name <- function(name) {
-  name |>
-    stringr::str_replace_all("–", "-") |>
-    stringr::str_replace_all("'", "'")
-}
-
-wrangle_2011_2016 <- function(input_dir, metadata_layer, year, fname) {
-  file_path <- here(input_dir, metadata_layer, year, fname)
-  # Column name pattern: "Population en 2011" or similar
-  pop_col <- paste0("Population en ", year)
-
-  df <- read_csv(file_path, skip = 2, show_col_types = FALSE) |>
-    slice(1:(n() - 4)) |>
-    rename(arrondissement = 1) |>
-    select(arrondissement, population = any_of(pop_col)) |>
-    filter(!arrondissement %in% c("Autres villes", "Ville de Montréal", "AGGLOMÉRATION DE MONTRÉAL")) |>
-    mutate(
-      arrondissement = normalize_name(arrondissement),
-      year = as.integer(year),
-      population = parse_number(as.character(population))
-    )
-
-  df
-}
+source(here("pipelines", "transform", "src", "wranglers", "population", "wrangle_1991.R"))
+source(here("pipelines", "transform", "src", "wranglers", "population", "wrangle_1996.R"))
+source(here("pipelines", "transform", "src", "wranglers", "population", "wrangle_2001.R"))
+source(here("pipelines", "transform", "src", "wranglers", "population", "wrangle_2006.R"))
+source(here("pipelines", "transform", "src", "wranglers", "population", "wrangle_2011.R"))
+source(here("pipelines", "transform", "src", "wranglers", "population", "wrangle_2016.R"))
+source(here("pipelines", "transform", "src", "wranglers", "population", "wrangle_2021.R"))
 
 metadata_aggregation <- function() {
 
@@ -40,10 +22,15 @@ metadata_aggregation <- function() {
   metadata_layer <- "population"
   fname <- "population_mtl_by_district.csv"
 
-  df_2011 <- wrangle_2011_2016(input_dir, metadata_layer, "2011", fname)
-  df_2016 <- wrangle_2011_2016(input_dir, metadata_layer, "2016", fname)
+  df_1991 <- wrangle_1991(input_dir, metadata_layer) |> mutate(source = "StatCan 1991 Census profiles")
+  df_1996 <- wrangle_1996(input_dir, metadata_layer) |> mutate(source = "StatCan 1996 Census profiles")
+  df_2001 <- wrangle_2001(input_dir, metadata_layer) |> mutate(source = "StatCan 2001 Census profiles")
+  df_2006 <- wrangle_2006(input_dir, metadata_layer, fname)
+  df_2011 <- wrangle_2011(input_dir, metadata_layer, fname)
+  df_2016 <- wrangle_2016(input_dir, metadata_layer, fname)
+  df_2021 <- wrangle_2021(input_dir, metadata_layer, fname)
 
-  df <- bind_rows(df_2011, df_2016)
+  df <- bind_rows(df_1991, df_1996, df_2001, df_2006, df_2011, df_2016, df_2021)
 
   # OUTPUT
   output_path <- here("pipelines", "transform", "input", "metadata.csv")

@@ -1,0 +1,442 @@
+---
+title: "Census data: aggregation queries"
+format: html
+---
+
+Testing DuckDB queries against our census tables — the same queries
+we'll run in the frontend via DuckDB-WASM.
+
+**Part 1**: Arrondissement-level demographics (`census_population.parquet`)
+**Part 2**: DA-level star schema (`geo_da`, `census_demographics`, `census_economics`, `census_income`)
+
+```{r}
+library(duckdb)
+con <- dbConnect(duckdb())
+```
+
+# Part 1: Arrondissement-level demographics
+
+## Load the parquet file
+
+```{r}
+parquet_path <- here::here("pipelines", "transform", "input", "census_population.parquet")
+dbExecute(con, sprintf("CREATE VIEW pop AS SELECT * FROM '%s'", parquet_path))
+```
+
+### Quick look at the data
+
+```{r}
+dbGetQuery(con, "SHOW ALL TABLES")
+```
+
+```{r}
+dbGetQuery(con, "SELECT * FROM pop")
+```
+
+```{r}
+dbGetQuery(con, "
+  SELECT year, source, sex,
+         COUNT(DISTINCT arrondissement) AS districts,
+         COUNT(*) AS rows
+  FROM pop
+  GROUP BY year, source, sex
+  ORDER BY year, source, sex
+")
+```
+
+## 1. Total population by district (2021)
+
+The simplest aggregation — sum across all age groups for sex='total'.
+
+```{r}
+dbGetQuery(con, "
+  SELECT arrondissement, SUM(population) AS total_pop
+  FROM pop
+  WHERE year = 2021 AND sex = 'total'
+  GROUP BY arrondissement
+  ORDER BY total_pop DESC
+")
+```
+
+## 2. Age pyramid for a single district
+
+Classic demographic query — male/female counts by age group for one arrondissement.
+
+```{r}
+dbGetQuery(con, "
+  SELECT age_group, sex, population
+  FROM pop
+  WHERE arrondissement = 'Le Plateau-Mont-Royal'
+    AND year = 2021
+    AND sex IN ('male', 'female')
+  ORDER BY age_group, sex
+")
+```
+
+## 3. Compare age distribution across districts
+
+Which districts are youngest/oldest? Compute share of population under 15 and over 65.
+
+```{r}
+dbGetQuery(con, "
+  WITH totals AS (
+    SELECT arrondissement, SUM(population) AS total
+    FROM pop WHERE year = 2021 AND sex = 'total'
+    GROUP BY arrondissement
+  ),
+  young AS (
+    SELECT arrondissement, SUM(population) AS pop_young
+    FROM pop
+    WHERE year = 2021 AND sex = 'total'
+      AND age_group IN ('0-4', '5-9', '10-14')
+    GROUP BY arrondissement
+  ),
+  old AS (
+    SELECT arrondissement, SUM(population) AS pop_old
+    FROM pop
+    WHERE year = 2021 AND sex = 'total'
+      AND age_group IN ('65-69', '70-74', '75-79', '80-84', '85-89', '90-94', '95-99', '100+')
+    GROUP BY arrondissement
+  )
+  SELECT t.arrondissement,
+         t.total,
+         ROUND(100.0 * y.pop_young / t.total, 1) AS pct_under_15,
+         ROUND(100.0 * o.pop_old / t.total, 1) AS pct_over_65,
+         ROUND(100.0 * (t.total - y.pop_young - o.pop_old) / t.total, 1) AS pct_working_age
+  FROM totals t
+  JOIN young y USING (arrondissement)
+  JOIN old o USING (arrondissement)
+  ORDER BY pct_over_65 DESC
+")
+```
+
+## 4. Population change 2016 → 2021
+
+Compare total population across census years for districts that have data in both.
+
+```{r}
+dbGetQuery(con, "
+  WITH by_year AS (
+    SELECT arrondissement, year, SUM(population) AS total
+    FROM pop
+    WHERE sex = 'total'
+    GROUP BY arrondissement, year
+  )
+  SELECT a.arrondissement,
+         a.total AS pop_2016,
+         b.total AS pop_2021,
+         b.total - a.total AS change,
+         ROUND(100.0 * (b.total - a.total) / a.total, 1) AS pct_change
+  FROM by_year a
+  JOIN by_year b ON a.arrondissement = b.arrondissement
+  WHERE a.year = 2016 AND b.year = 2021
+  ORDER BY pct_change DESC
+")
+```
+
+## 5. Sex ratio by district (2021)
+
+Male/female ratio — only for districts with male/female breakdown.
+
+```{r}
+dbGetQuery(con, "
+  WITH by_sex AS (
+    SELECT arrondissement, sex, SUM(population) AS total
+    FROM pop
+    WHERE year = 2021 AND sex IN ('male', 'female')
+    GROUP BY arrondissement, sex
+  )
+  SELECT m.arrondissement,
+         m.total AS male,
+         f.total AS female,
+         ROUND(100.0 * m.total / (m.total + f.total), 1) AS pct_male
+  FROM by_sex m
+  JOIN by_sex f ON m.arrondissement = f.arrondissement
+  WHERE m.sex = 'male' AND f.sex = 'female'
+  ORDER BY pct_male DESC
+")
+```
+
+## 6. Data coverage check
+
+Which districts have male/female breakdown vs total-only?
+This matters for 2016 arrondissements (Ville de Montréal source = total only).
+
+```{r}
+dbGetQuery(con, "
+  SELECT year, source,
+         COUNT(DISTINCT CASE WHEN sex = 'male' THEN arrondissement END) AS has_sex_split,
+         COUNT(DISTINCT CASE WHEN sex = 'total' THEN arrondissement END) AS has_total,
+         COUNT(DISTINCT arrondissement) AS all_districts
+  FROM pop
+  GROUP BY year, source
+  ORDER BY year, source
+")
+```
+
+## 7. Dependency ratio
+
+Classic demographic indicator: (population < 15 + population 65+) / population 15-64.
+Only meaningful with total population (not sex-split to avoid double-counting).
+
+```{r}
+dbGetQuery(con, "
+  WITH classified AS (
+    SELECT arrondissement, year,
+           CASE
+             WHEN age_group IN ('0-4','5-9','10-14') THEN 'young'
+             WHEN age_group IN ('65-69','70-74','75-79','80-84','85-89','90-94','95-99','100+') THEN 'old'
+             ELSE 'working'
+           END AS age_class,
+           population
+    FROM pop
+    WHERE sex = 'total'
+  )
+  SELECT arrondissement, year,
+         SUM(CASE WHEN age_class = 'young' THEN population ELSE 0 END) AS young,
+         SUM(CASE WHEN age_class = 'working' THEN population ELSE 0 END) AS working,
+         SUM(CASE WHEN age_class = 'old' THEN population ELSE 0 END) AS old,
+         ROUND(100.0 * (
+           SUM(CASE WHEN age_class IN ('young','old') THEN population ELSE 0 END)
+         ) / NULLIF(SUM(CASE WHEN age_class = 'working' THEN population ELSE 0 END), 0), 1) AS dependency_ratio
+  FROM classified
+  GROUP BY arrondissement, year
+  HAVING SUM(population) > 1000
+  ORDER BY year, dependency_ratio DESC
+")
+```
+
+# Part 2: DA-level star schema
+
+The DA-level data uses a star schema: one geometry table (`geo_da`) joined with
+long-format fact tables. This is the architecture for the DuckDB-WASM frontend.
+
+## Load the star schema tables
+
+```{r}
+dbExecute(con, "INSTALL spatial; LOAD spatial;")
+
+load_dir <- here::here("pipelines", "load", "output")
+dbExecute(con, sprintf("CREATE VIEW geo AS SELECT * FROM '%s/geo_da.parquet'", load_dir))
+dbExecute(con, sprintf("CREATE VIEW demo AS SELECT * FROM '%s/census_demographics.parquet'", load_dir))
+dbExecute(con, sprintf("CREATE VIEW econ AS SELECT * FROM '%s/census_economics.parquet'", load_dir))
+dbExecute(con, sprintf("CREATE VIEW income AS SELECT * FROM '%s/census_income.parquet'", load_dir))
+```
+
+### Table sizes
+
+```{r}
+dbGetQuery(con, "
+  SELECT 'geo_da' AS tbl, COUNT(*) AS rows FROM geo
+  UNION ALL SELECT 'demographics', COUNT(*) FROM demo
+  UNION ALL SELECT 'economics', COUNT(*) FROM econ
+  UNION ALL SELECT 'income', COUNT(*) FROM income
+")
+```
+
+## 8. Age pyramid at DA level
+
+Same query pattern as arrondissement, but now at dissemination area granularity.
+
+```{r}
+dbGetQuery(con, "
+  SELECT age_group, sex, population
+  FROM demo
+  WHERE geo_uid = '24660101' AND sex != 'total'
+  ORDER BY age_group, sex
+")
+```
+
+## 9. Youngest and oldest DAs
+
+Which DAs have the highest share of seniors (65+)?
+
+```{r}
+dbGetQuery(con, "
+  WITH totals AS (
+    SELECT geo_uid, SUM(population) AS total
+    FROM demo WHERE sex = 'total'
+    GROUP BY geo_uid
+    HAVING total > 100
+  ),
+  old AS (
+    SELECT geo_uid, SUM(population) AS pop_65plus
+    FROM demo
+    WHERE sex = 'total'
+      AND age_group IN ('65-69','70-74','75-79','80-84','85-89','90-94','95-99','100+')
+    GROUP BY geo_uid
+  )
+  SELECT t.geo_uid,
+         t.total,
+         o.pop_65plus,
+         ROUND(100.0 * o.pop_65plus / t.total, 1) AS pct_65plus
+  FROM totals t JOIN old o USING (geo_uid)
+  ORDER BY pct_65plus DESC
+  LIMIT 15
+")
+```
+
+## 10. Economics: variable overview
+
+What variables are available in the economics table?
+
+```{r}
+dbGetQuery(con, "
+  SELECT variable, sex, COUNT(*) AS n_das, ROUND(AVG(value), 1) AS avg_val
+  FROM econ
+  GROUP BY variable, sex
+  ORDER BY variable, sex
+")
+```
+
+## 11. Median household income — top and bottom DAs
+
+```{r}
+dbGetQuery(con, "
+  SELECT geo_uid, value AS median_hh_income
+  FROM econ
+  WHERE variable = 'median_income_household'
+    AND value IS NOT NULL
+  ORDER BY value DESC
+  LIMIT 10
+")
+```
+
+```{r}
+dbGetQuery(con, "
+  SELECT geo_uid, value AS median_hh_income
+  FROM econ
+  WHERE variable = 'median_income_household'
+    AND value IS NOT NULL AND value > 0
+  ORDER BY value ASC
+  LIMIT 10
+")
+```
+
+## 12. Low income prevalence (LIM-AT)
+
+Which DAs have the highest share of population in low income?
+
+```{r}
+dbGetQuery(con, "
+  SELECT geo_uid, value AS lim_at_pct
+  FROM econ
+  WHERE variable = 'lim_at_prevalence'
+    AND value IS NOT NULL
+  ORDER BY value DESC
+  LIMIT 15
+")
+```
+
+## 13. Income distribution: histogram for one DA
+
+The full bracket breakdown — what you'd display as a bar chart on click.
+
+```{r}
+dbGetQuery(con, "
+  SELECT bracket, count
+  FROM income
+  WHERE geo_uid = '24660101'
+    AND income_type = 'total_income'
+    AND sex = 'total'
+  ORDER BY count DESC
+")
+```
+
+## 14. Income inequality across DAs
+
+Compute % earning over $100K from the bracket data.
+
+```{r}
+dbGetQuery(con, "
+  WITH brackets AS (
+    SELECT geo_uid,
+      SUM(count) AS total_pop,
+      SUM(CASE WHEN bracket IN ('$100,000-$149,999', '$150,000+')
+               THEN count ELSE 0 END) AS over_100k
+    FROM income
+    WHERE income_type = 'total_income' AND sex = 'total'
+    GROUP BY geo_uid
+    HAVING total_pop > 100
+  )
+  SELECT geo_uid, total_pop, over_100k,
+         ROUND(100.0 * over_100k / total_pop, 1) AS pct_over_100k
+  FROM brackets
+  ORDER BY pct_over_100k DESC
+  LIMIT 15
+")
+```
+
+## 15. Join pattern: geo + economics
+
+The fundamental frontend query — join geometry with a fact table for choropleths.
+
+```{r}
+dbGetQuery(con, "
+  SELECT g.geo_uid, g.area_sqkm, e.value AS median_income
+  FROM geo g
+  JOIN econ e ON g.geo_uid = e.geo_uid
+  WHERE e.variable = 'median_income_household'
+  ORDER BY e.value DESC
+  LIMIT 10
+")
+```
+
+## 16. Gender income gap by DA
+
+Compare male vs female median income.
+
+```{r}
+dbGetQuery(con, "
+  WITH by_sex AS (
+    SELECT geo_uid, sex, value
+    FROM econ
+    WHERE variable = 'median_income' AND sex IN ('male', 'female')
+      AND value IS NOT NULL AND value > 0
+  )
+  SELECT m.geo_uid,
+         m.value AS male_median,
+         f.value AS female_median,
+         ROUND(100.0 * (m.value - f.value) / m.value, 1) AS gap_pct
+  FROM by_sex m
+  JOIN by_sex f ON m.geo_uid = f.geo_uid
+  WHERE m.sex = 'male' AND f.sex = 'female'
+  ORDER BY gap_pct DESC
+  LIMIT 15
+")
+```
+
+## 17. Household income distribution comparison: renters vs owners
+
+Cross-table query: join economics (tenure) with income brackets for DAs
+that are majority-renter vs majority-owner.
+
+```{r}
+dbGetQuery(con, "
+  WITH tenure AS (
+    SELECT geo_uid,
+      MAX(CASE WHEN variable = 'tenure_owner' THEN value END) AS owners,
+      MAX(CASE WHEN variable = 'tenure_renter' THEN value END) AS renters
+    FROM econ
+    WHERE variable IN ('tenure_owner', 'tenure_renter')
+    GROUP BY geo_uid
+    HAVING owners > 0 AND renters > 0
+  ),
+  classified AS (
+    SELECT geo_uid,
+      CASE WHEN renters > owners THEN 'majority_renter' ELSE 'majority_owner' END AS tenure_type
+    FROM tenure
+  )
+  SELECT c.tenure_type, i.bracket,
+         SUM(i.count) AS total_count
+  FROM classified c
+  JOIN income i ON c.geo_uid = i.geo_uid
+  WHERE i.income_type = 'household_total_income' AND i.sex = 'total'
+  GROUP BY c.tenure_type, i.bracket
+  ORDER BY c.tenure_type, i.bracket
+")
+```
+
+```{r}
+dbDisconnect(con)
+```

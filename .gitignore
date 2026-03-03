@@ -57,3 +57,5 @@ pipelines/ingest/input/
 pipelines/transform/tests/test-census_aggregation.R
 notebooks/01_boundary_file_census_2021.qmd
 pipelines/transform/input/*.geojson
+CLAUDE_files/
+notebooks/02_aggregation_files/

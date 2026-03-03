@@ -1,7 +1,8 @@
 # Montreal ETL Pipeline
 # This is the maestro pipeline
 
-source(here::here("pipelines", "ingest", "src", "ingest.R"))
+source(here::here("pipelines", "ingest", "src", "geo.R"))
+source(here::here("pipelines", "ingest", "src", "census.R"))
 source(here::here("pipelines", "transform", "src", "geo_aggregation.R"))
 source(here::here("pipelines", "transform", "src", "metadata_aggregation.R"))
 source(here::here("pipelines", "transform", "src", "census_aggregation.R"))
@@ -25,9 +26,14 @@ ingest_cma <- function() {
 #' Ingest population data
 #' @maestroOutputs transform_metadata
 ingest_population <- function() {
-  # Population data is downloaded via Excel sheets in ingest.R
-  # For now this is a placeholder - add population_by_district() when ready
   population_by_district()
+  census_1991_by_district()
+  census_1996_by_district()
+  census_2001_by_district()
+  census_2006_by_district()
+  census_2011_by_district()
+  census_2016_by_district()
+  census_2021_by_district()
 }
 
 # =============================================================================
@@ -46,24 +52,19 @@ transform_metadata <- function(.input) {
   metadata_aggregation()
 }
 
-#' Ingest census data (cancensus handles caching via API)
-#' @maestroOutputs transform_census
-ingest_census <- function() {
-  TRUE
-}
-
-#' Transform census data at DA and CT level
-#' @maestroInputs ingest_census
-transform_census <- function(.input) {
-  census_aggregation()
+#' Ingest DA-level census bulk CSV + boundary shapefile
+#' @maestroOutputs load_census_da
+ingest_census_da <- function() {
+  census_2021_da()
+  da_boundary_2021()
 }
 
 # =============================================================================
 # LOAD PIPELINES
 # =============================================================================
 
-#' Convert census GeoJSON to spatial Parquet via DuckDB
-#' @maestroInputs transform_census
-load_census <- function(.input) {
-  system2("bash", here::here("pipelines", "load", "src", "census_to_parquet.sh"))
+#' Build DA census parquet from bulk CSV + shapefile via DuckDB
+#' @maestroInputs ingest_census_da
+load_census_da <- function(.input) {
+  system2("bash", here::here("pipelines", "load", "src", "census_da_from_bulk.sh"))
 }
