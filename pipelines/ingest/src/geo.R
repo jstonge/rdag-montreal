@@ -83,6 +83,33 @@ da_boundary_2011 <- function(force = FALSE) {
   )
 }
 
+montreal_dem <- function(force = FALSE) {
+  output_dir <- here("pipelines", "ingest", "input", "geo")
+  output_file <- file.path(output_dir, "mt_royal_dem.tif")
+
+  if (!force && file.exists(output_file)) {
+    message("File already exists: mt_royal_dem.tif (use force=TRUE to re-download)")
+    return(invisible(output_file))
+  }
+
+  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+  # Fetch a small SRTM clip covering Mount Royal from OpenTopography
+  url <- paste0(
+    "https://portal.opentopography.org/API/globaldem?",
+    "demtype=SRTMGL1&south=45.49&north=45.52&west=-73.62&east=-73.57",
+    "&outputFormat=GTiff&API_Key=demoapikeyot2022"
+  )
+
+  message("Fetching Mount Royal DEM from OpenTopography...")
+  httr2::request(url) |>
+    httr2::req_timeout(60) |>
+    httr2::req_perform(path = output_file)
+
+  message(sprintf("Wrote DEM to %s", output_file))
+  invisible(output_file)
+}
+
 montreal_streets_osm <- function(force = FALSE) {
   output_dir <- here("pipelines", "ingest", "input", "geo")
   output_file <- file.path(output_dir, "montreal-streets.geojson")

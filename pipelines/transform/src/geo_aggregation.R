@@ -46,5 +46,23 @@ geo_aggregation <- function() {
     streets_path <- NULL
   }
 
-  list(districts = districts_path, boundary = boundary_path, streets = streets_path)
+  # Extract contour lines from DEM for Mount Royal area
+  dem_file <- here("pipelines", "ingest", "input", "geo", "mt_royal_dem.tif")
+  if (file.exists(dem_file)) {
+    dem <- terra::rast(dem_file)
+
+    # Generate contour lines every 25m
+    contours <- terra::as.contour(dem, levels = seq(25, 250, by = 25)) |>
+      sf::st_as_sf()
+
+    contours_path <- here("pipelines", "transform", "input", "contours.geojson")
+    sf::st_write(contours, contours_path, delete_dsn = TRUE, quiet = TRUE)
+    message(sprintf("Wrote %d contour lines to %s", nrow(contours), contours_path))
+  } else {
+    message("Skipping contours (run montreal_dem() in ingest first)")
+    contours_path <- NULL
+    contours_path <- NULL
+  }
+
+  list(districts = districts_path, boundary = boundary_path, streets = streets_path, contours = contours_path)
 }
