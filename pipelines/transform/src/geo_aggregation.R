@@ -46,21 +46,14 @@ geo_aggregation <- function() {
     streets_path <- NULL
   }
 
-  # Extract contour lines from DEM for Mount Royal area
+  # Extract contour lines from DEM for Mount Royal (requires gdal_contour on PATH)
   dem_file <- here("pipelines", "ingest", "input", "geo", "mt_royal_dem.tif")
+  contours_path <- here("pipelines", "transform", "input", "contours.geojson")
   if (file.exists(dem_file)) {
-    dem <- terra::rast(dem_file)
-
-    # Generate contour lines every 25m
-    contours <- terra::as.contour(dem, levels = seq(25, 250, by = 25)) |>
-      sf::st_as_sf()
-
-    contours_path <- here("pipelines", "transform", "input", "contours.geojson")
-    sf::st_write(contours, contours_path, delete_dsn = TRUE, quiet = TRUE)
-    message(sprintf("Wrote %d contour lines to %s", nrow(contours), contours_path))
+    system2("gdal_contour", c("-a", "elevation", "-i", "10", dem_file, contours_path, "-f", "GeoJSON"))
+    message(sprintf("Wrote contours to %s", contours_path))
   } else {
     message("Skipping contours (run montreal_dem() in ingest first)")
-    contours_path <- NULL
     contours_path <- NULL
   }
 
