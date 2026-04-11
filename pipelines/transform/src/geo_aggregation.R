@@ -31,7 +31,11 @@ geo_aggregation <- function() {
   # Load and simplify streets from Overpass export
   streets_input <- here("pipelines", "ingest", "input", "geo", "montreal-streets.geojson")
   if (file.exists(streets_input)) {
+    # Clip to Montreal bounding box (Overpass sometimes returns features outside the area)
+    montreal_bbox <- sf::st_bbox(c(xmin = -73.97, ymin = 45.40, xmax = -73.47, ymax = 45.70),
+                                  crs = sf::st_crs(4326)) |> sf::st_as_sfc()
     streets <- sf::st_read(streets_input, quiet = TRUE) |>
+      sf::st_intersection(montreal_bbox) |>
       rmapshaper::ms_simplify(keep = 0.1, keep_shapes = TRUE)
 
     streets_path <- here("pipelines", "transform", "input", "streets.geojson")
