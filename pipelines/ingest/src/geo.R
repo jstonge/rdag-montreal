@@ -56,6 +56,76 @@ montreal_adm_boundaries <- function(force = FALSE) {
   )
 }
 
+da_boundary_2001 <- function(force = FALSE) {
+  download_file(
+    url = "https://www12.statcan.gc.ca/census-recensement/2011/geo/bound-limit/files-fichiers/gda_000b01a_e.zip",
+    output_path = here("pipelines", "ingest", "input", "geo"),
+    filename = "da_boundary_2001.zip",
+    force = force
+  )
+}
+
+da_boundary_2006 <- function(force = FALSE) {
+  download_file(
+    url = "https://www12.statcan.gc.ca/census-recensement/2011/geo/bound-limit/files-fichiers/gda_000b06a_e.zip",
+    output_path = here("pipelines", "ingest", "input", "geo"),
+    filename = "da_boundary_2006.zip",
+    force = force
+  )
+}
+
+da_boundary_2011 <- function(force = FALSE) {
+  download_file(
+    url = "https://www12.statcan.gc.ca/census-recensement/2011/geo/bound-limit/files-fichiers/gda_000b11a_e.zip",
+    output_path = here("pipelines", "ingest", "input", "geo"),
+    filename = "da_boundary_2011.zip",
+    force = force
+  )
+}
+
+montreal_streets_osm <- function(force = FALSE) {
+  output_dir <- here("pipelines", "ingest", "input", "geo")
+  output_file <- file.path(output_dir, "montreal-streets.geojson")
+  
+  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+  query <- '[out:json][timeout:90];
+area["name"="Montréal"]["admin_level"="8"]["boundary"="administrative"]->.montreal;
+(
+  way["highway"~"^(motorway|trunk|primary|secondary|tertiary)$"](area.montreal);
+);
+out geom;'
+
+  message("Fetching Montreal streets from Overpass API...")
+  resp <- httr2::request("https://overpass-api.de/api/interpreter") |>
+    httr2::req_body_form(data = query) |>
+    httr2::req_timeout(120) |>
+    httr2::req_perform() |>
+    httr2::resp_body_json()
+
+  ways <- Filter(function(el) el$type == "way" && length(el$geometry) >= 2, resp$elements)
+
+  features <- lapply(ways, function(el) {
+    coords <- lapply(el$geometry, function(n) c(n$lon, n$lat))
+    list(
+      type = "Feature",
+      properties = list(
+        name = if (!is.null(el$tags$name)) el$tags$name else NA,
+        highway = if (!is.null(el$tags$highway)) el$tags$highway else NA
+      ),
+      geometry = list(
+        type = "LineString",
+        coordinates = coords
+      )
+    )
+  })
+
+  geojson <- list(type = "FeatureCollection", features = features)
+  jsonlite::write_json(geojson, output_file, auto_unbox = TRUE, digits = 7)
+  message(sprintf("Wrote %d street features to %s", length(features), output_file))
+  invisible(output_file)
+}
+
 da_boundary_2021 <- function(force = FALSE) {
   download_file(
     url = "https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lda_000b21a_e.zip",

@@ -28,5 +28,19 @@ geo_aggregation <- function() {
   message(sprintf("Wrote %d districts to %s", nrow(districts), districts_path))
   message(sprintf("Wrote %d boundary features to %s", nrow(boundary), boundary_path))
 
-  list(districts = districts_path, boundary = boundary_path)
+  # Load and simplify streets from Overpass export
+  streets_input <- here("pipelines", "ingest", "input", "geo", "montreal-streets.geojson")
+  if (file.exists(streets_input)) {
+    streets <- sf::st_read(streets_input, quiet = TRUE) |>
+      rmapshaper::ms_simplify(keep = 0.1, keep_shapes = TRUE)
+
+    streets_path <- here("pipelines", "transform", "input", "streets.geojson")
+    sf::st_write(streets, streets_path, delete_dsn = TRUE, quiet = TRUE)
+    message(sprintf("Wrote %d street features to %s", nrow(streets), streets_path))
+  } else {
+    message("Skipping streets (run montreal_streets_osm() in ingest first)")
+    streets_path <- NULL
+  }
+
+  list(districts = districts_path, boundary = boundary_path, streets = streets_path)
 }

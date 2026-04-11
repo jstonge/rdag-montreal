@@ -7,7 +7,7 @@ Testing DuckDB queries against our census tables — the same queries
 we'll run in the frontend via DuckDB-WASM.
 
 **Part 1**: Arrondissement-level demographics (`census_population.parquet`)
-**Part 2**: DA-level star schema (`geo_da`, `census_demographics`, `census_economics`, `census_income`)
+**Part 2**: DA-level star schema, multi-year (`geo_da`, `census_demographics`, `census_economics`, `census_income`)
 
 ```{r}
 library(duckdb)
@@ -223,18 +223,19 @@ dbExecute(con, sprintf("CREATE VIEW econ AS SELECT * FROM '%s/census_economics.p
 dbExecute(con, sprintf("CREATE VIEW income AS SELECT * FROM '%s/census_income.parquet'", load_dir))
 ```
 
-### Table sizes
+### Table sizes (by year)
 
 ```{r}
 dbGetQuery(con, "
-  SELECT 'geo_da' AS tbl, COUNT(*) AS rows FROM geo
-  UNION ALL SELECT 'demographics', COUNT(*) FROM demo
-  UNION ALL SELECT 'economics', COUNT(*) FROM econ
-  UNION ALL SELECT 'income', COUNT(*) FROM income
+  SELECT 'geo_da' AS tbl, year, COUNT(*) AS rows FROM geo GROUP BY year
+  UNION ALL SELECT 'demographics', year, COUNT(*) FROM demo GROUP BY year
+  UNION ALL SELECT 'economics', year, COUNT(*) FROM econ GROUP BY year
+  UNION ALL SELECT 'income', year, COUNT(*) FROM income GROUP BY year
+  ORDER BY tbl, year
 ")
 ```
 
-## 8. Age pyramid at DA level
+## 8. Age pyramid at DA level (2021)
 
 Same query pattern as arrondissement, but now at dissemination area granularity.
 
@@ -242,12 +243,12 @@ Same query pattern as arrondissement, but now at dissemination area granularity.
 dbGetQuery(con, "
   SELECT age_group, sex, population
   FROM demo
-  WHERE geo_uid = '24660101' AND sex != 'total'
+  WHERE geo_uid = '24660101' AND year = 2021 AND sex != 'total'
   ORDER BY age_group, sex
 ")
 ```
 
-## 9. Youngest and oldest DAs
+## 9. Youngest and oldest DAs (2021)
 
 Which DAs have the highest share of seniors (65+)?
 
@@ -255,14 +256,14 @@ Which DAs have the highest share of seniors (65+)?
 dbGetQuery(con, "
   WITH totals AS (
     SELECT geo_uid, SUM(population) AS total
-    FROM demo WHERE sex = 'total'
+    FROM demo WHERE sex = 'total' AND year = 2021
     GROUP BY geo_uid
     HAVING total > 100
   ),
   old AS (
     SELECT geo_uid, SUM(population) AS pop_65plus
     FROM demo
-    WHERE sex = 'total'
+    WHERE sex = 'total' AND year = 2021
       AND age_group IN ('65-69','70-74','75-79','80-84','85-89','90-94','95-99','100+')
     GROUP BY geo_uid
   )
@@ -276,16 +277,16 @@ dbGetQuery(con, "
 ")
 ```
 
-## 10. Economics: variable overview
+## 10. Economics: variable overview (by year)
 
 What variables are available in the economics table?
 
 ```{r}
 dbGetQuery(con, "
-  SELECT variable, sex, COUNT(*) AS n_das, ROUND(AVG(value), 1) AS avg_val
+  SELECT year, variable, sex, COUNT(*) AS n_das, ROUND(AVG(value), 1) AS avg_val
   FROM econ
-  GROUP BY variable, sex
-  ORDER BY variable, sex
+  GROUP BY year, variable, sex
+  ORDER BY year, variable, sex
 ")
 ```
 
@@ -367,22 +368,23 @@ dbGetQuery(con, "
 ")
 ```
 
-## 15. Join pattern: geo + economics
+## 15. Join pattern: geo + economics (with year)
 
 The fundamental frontend query — join geometry with a fact table for choropleths.
+Note: must join on both `geo_uid` AND `year` since DA boundaries differ between censuses.
 
 ```{r}
 dbGetQuery(con, "
   SELECT g.geo_uid, g.area_sqkm, e.value AS median_income
   FROM geo g
-  JOIN econ e ON g.geo_uid = e.geo_uid
-  WHERE e.variable = 'median_income_household'
+  JOIN econ e ON g.geo_uid = e.geo_uid AND g.year = e.year
+  WHERE e.variable = 'median_income_household' AND e.year = 2021
   ORDER BY e.value DESC
   LIMIT 10
 ")
 ```
 
-## 16. Gender income gap by DA
+## 16. Gender income gap by DA (2021)
 
 Compare male vs female median income.
 
@@ -391,7 +393,8 @@ dbGetQuery(con, "
   WITH by_sex AS (
     SELECT geo_uid, sex, value
     FROM econ
-    WHERE variable = 'median_income' AND sex IN ('male', 'female')
+    WHERE variable = 'median_income' AND year = 2021
+      AND sex IN ('male', 'female')
       AND value IS NOT NULL AND value > 0
   )
   SELECT m.geo_uid,
@@ -406,7 +409,7 @@ dbGetQuery(con, "
 ")
 ```
 
-## 17. Household income distribution comparison: renters vs owners
+## 17. Household income distribution comparison: renters vs owners (2021)
 
 Cross-table query: join economics (tenure) with income brackets for DAs
 that are majority-renter vs majority-owner.
@@ -418,7 +421,7 @@ dbGetQuery(con, "
       MAX(CASE WHEN variable = 'tenure_owner' THEN value END) AS owners,
       MAX(CASE WHEN variable = 'tenure_renter' THEN value END) AS renters
     FROM econ
-    WHERE variable IN ('tenure_owner', 'tenure_renter')
+    WHERE variable IN ('tenure_owner', 'tenure_renter') AND year = 2021
     GROUP BY geo_uid
     HAVING owners > 0 AND renters > 0
   ),
@@ -434,6 +437,90 @@ dbGetQuery(con, "
   WHERE i.income_type = 'household_total_income' AND i.sex = 'total'
   GROUP BY c.tenure_type, i.bracket
   ORDER BY c.tenure_type, i.bracket
+")
+```
+
+# Part 3: Cross-year comparison (2011 vs 2021)
+
+## 18. Population change by DA (2011 vs 2021)
+
+Compare total population across census years. Only DAs that exist in both years
+(same geo_uid — note boundaries may have changed slightly).
+
+```{r}
+dbGetQuery(con, "
+  WITH by_year AS (
+    SELECT year, geo_uid, value AS pop
+    FROM econ
+    WHERE variable = 'pop_total'
+  )
+  SELECT a.geo_uid,
+         a.pop AS pop_2011,
+         b.pop AS pop_2021,
+         b.pop - a.pop AS change,
+         ROUND(100.0 * (b.pop - a.pop) / NULLIF(a.pop, 0), 1) AS pct_change
+  FROM by_year a
+  JOIN by_year b ON a.geo_uid = b.geo_uid
+  WHERE a.year = 2011 AND b.year = 2021
+  ORDER BY pct_change DESC
+  LIMIT 15
+")
+```
+
+## 19. Language shift: English vs French mother tongue
+
+How did the English/French mother tongue balance change at DA level?
+
+```{r}
+dbGetQuery(con, "
+  WITH lang AS (
+    SELECT year, geo_uid, variable, value
+    FROM econ
+    WHERE variable IN ('lang_mother_english', 'lang_mother_french')
+      AND sex = 'total'
+  )
+  SELECT year,
+         SUM(CASE WHEN variable = 'lang_mother_english' THEN value END) AS english,
+         SUM(CASE WHEN variable = 'lang_mother_french' THEN value END) AS french,
+         ROUND(100.0 * SUM(CASE WHEN variable = 'lang_mother_english' THEN value END)
+           / NULLIF(SUM(CASE WHEN variable = 'lang_mother_english' THEN value END)
+             + SUM(CASE WHEN variable = 'lang_mother_french' THEN value END), 0), 1) AS pct_english
+  FROM lang
+  GROUP BY year
+  ORDER BY year
+")
+```
+
+## 20. Age structure comparison (2011 vs 2021)
+
+Compare the share of young (0-14) and seniors (65+) across years.
+Note: 2011 top bucket is '85+', 2021 has 85-89, 90-94, 95-99, 100+.
+
+```{r}
+dbGetQuery(con, "
+  WITH classified AS (
+    SELECT year,
+      CASE
+        WHEN age_group IN ('0-4','5-9','10-14') THEN 'young'
+        WHEN age_group IN ('65-69','70-74','75-79','80-84') THEN 'old'
+        WHEN age_group IN ('85+','85-89','90-94','95-99','100+') THEN 'old'
+        ELSE 'working'
+      END AS age_class,
+      population
+    FROM demo
+    WHERE sex = 'total'
+  )
+  SELECT year,
+    SUM(population) AS total,
+    ROUND(100.0 * SUM(CASE WHEN age_class = 'young' THEN population END)
+      / SUM(population), 1) AS pct_young,
+    ROUND(100.0 * SUM(CASE WHEN age_class = 'old' THEN population END)
+      / SUM(population), 1) AS pct_65plus,
+    ROUND(100.0 * SUM(CASE WHEN age_class = 'working' THEN population END)
+      / SUM(population), 1) AS pct_working
+  FROM classified
+  GROUP BY year
+  ORDER BY year
 ")
 ```
 

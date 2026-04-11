@@ -20,9 +20,14 @@ pipelines/
       2006_statcan/ 2011_statcan/  # Per-CSD CSVs from StatCan
       2016_statcan/ 2021_statcan/  # Bulk Quebec CSV extracts (montreal_population_YYYY.csv
                                    #   + montreal_census_YYYY.csv for full profiles)
-    census_da/2021/              # DA-level bulk CSV from StatCan (quebec_da_2021/)
+    census_da/
+      2011/                      # DA-level bulk CSV from StatCan Census Profile (quebec_da_2011/)
+      2021/                      # DA-level bulk CSV from StatCan (quebec_da_2021/)
     geo/                         # Boundary shapefiles and GeoJSON
-      da_boundary_2021/          # DA boundary shapefile from StatCan
+      da_boundary_2001/          # 2001 DA boundary (converted from .e00 to .gpkg)
+      da_boundary_2006/          # 2006 DA boundary shapefile from StatCan
+      da_boundary_2011/          # 2011 DA boundary shapefile from StatCan
+      da_boundary_2021/          # 2021 DA boundary shapefile from StatCan
   transform/src/
     metadata_aggregation.R       # Combines population wranglers -> metadata.csv
     demographics_aggregation.R   # Combines age×sex wranglers -> census_population.parquet
@@ -38,12 +43,14 @@ pipelines/
   transform/tests/
     test_metadata.R              # Cross-validates population across sources (7 tests, 14 expectations)
   load/src/
-    census_da_from_bulk.sh       # DuckDB: bulk CSV + shapefile -> star schema (DA level)
+    census_da_2021.sh            # DuckDB: 2021 bulk CSV + shapefile -> year-specific parquet
+    census_da_2011.sh            # DuckDB: 2011 Census Profile CSV + shapefile -> year-specific parquet
+    census_da_combine.sh         # DuckDB: combine year-specific files into final multi-year parquet
   load/output/
-    geo_da.parquet               # Geometry layer (3,219 DAs with geom)
-    census_demographics.parquet  # Age × sex fact table (long format, ~204K rows)
-    census_economics.parquet     # Generic measures fact table (long format, ~94K rows)
-    census_income.parquet        # Income distribution fact table (long format, ~373K rows)
+    geo_da.parquet               # Geometry layer (2011 + 2021, ~6.4K DAs with geom)
+    census_demographics.parquet  # Age × sex fact table (2011 + 2021, ~377K rows)
+    census_economics.parquet     # Generic measures fact table (2011 + 2021, ~117K rows)
+    census_income.parquet        # Income distribution fact table (2021 only, ~373K rows)
 ```
 
 ## Key design decisions
@@ -71,65 +78,64 @@ Per-row `source` column tracks provenance. Cross-validated in test_metadata.R.
 - **Load**: reshape for a specific consumer. Column selection, geo joins, format conversion.
   Output = `load/output/` files ready for the frontend.
 
-### DA-level pipeline (star schema)
+### DA-level pipeline (multi-year star schema)
 
 The primary geographic unit for analysis. Replaces the earlier cancensus API approach.
 Uses a star schema: one geometry table joined with long-format fact tables.
-Scalable — new variables or categories are added as rows, not columns.
+All tables have a `year` column for multi-census comparison.
 
-**Pipeline**: `ingest_census_da` (download bulk CSV + DA shapefile) → `load_census_da`
-(DuckDB → 4 parquet files)
+**Pipeline**: `ingest_census_da` (download bulk CSVs + DA shapefiles for 2011 + 2021) →
+`load_census_da` (DuckDB: `census_da_2021.sh` → `census_da_2011.sh` → `census_da_combine.sh`)
 
-**Output tables** (3,219 DAs covering the full Montreal agglomeration, CD 2466):
+**2011 vs 2021 data availability at DA level:**
+- 2011 Census Profile: demographics (18 age groups, top = 85+), language, dwellings
+- 2011 has NO income, tenure, or immigration (those were in NHS, not available at DA)
+- 2021 Census Profile: demographics (21 age groups), income, tenure, immigration, language
+- 2011: 3,194 DAs | 2021: 3,219 DAs (DA boundaries change between censuses)
+
+**Output tables** (Montreal agglomeration, CD 2466):
 
 ```
-geo_da.parquet                 ← geometry layer (one row per DA)
-├── geo_uid, da_name, area_sqkm, geom
-└── 3,219 rows — loaded once, joined with any fact table
+geo_da.parquet                 ← geometry layer (one row per DA per year)
+├── year, geo_uid, da_name, area_sqkm, geom
+└── ~6.4K rows (3,194 for 2011 + 3,219 for 2021)
 
 census_demographics.parquet    ← age × sex fact table (long format)
-├── geo_uid, age_group, sex, population
-└── ~204K rows (3,245 DAs × 21 age groups × 3 sexes)
+├── year, geo_uid, age_group, sex, population
+└── ~377K rows (2011: 18 age groups × 3 sexes + 2021: 21 age groups × 3 sexes)
 
 census_economics.parquet       ← generic measures fact table (long format)
-├── geo_uid, variable, sex, value
-└── ~94K rows (3,245 DAs × 29 variable-sex combinations)
-│   Includes LIM-AT/LICO-AT low income measures
+├── year, geo_uid, variable, sex, value
+└── ~117K rows (2011: 5 variables + 2021: 19 variables with LIM-AT/LICO-AT)
 
 census_income.parquet          ← income distribution fact table (long format)
-├── geo_uid, income_type, bracket, sex, count
-└── ~373K rows — 4 income types × leaf brackets × DAs
-│   income_type: total_income (13 brackets, 3 sexes)
-│                aftertax_income (13 brackets, 3 sexes)
-│                household_total_income (19 brackets, total only)
-│                household_aftertax_income (18 brackets, total only)
+├── year, geo_uid, income_type, bracket, sex, count
+└── ~373K rows (2021 only — 4 income types × leaf brackets × DAs)
 ```
 
 **Frontend query patterns** (DuckDB-WASM):
 ```sql
--- Choropleth: color map by median household income
+-- Choropleth: color map by median household income (2021)
 SELECT g.geom, e.value FROM geo_da g
-JOIN census_economics e ON g.geo_uid = e.geo_uid
-WHERE e.variable = 'median_income_household'
+JOIN census_economics e ON g.geo_uid = e.geo_uid AND g.year = e.year
+WHERE e.variable = 'median_income_household' AND e.year = 2021
 
--- Age pyramid for one DA
+-- Age pyramid for one DA (single year)
 SELECT age_group, sex, population FROM census_demographics
-WHERE geo_uid = '24660837' AND sex != 'total'
+WHERE geo_uid = '24660837' AND year = 2021 AND sex != 'total'
 
--- Income histogram for one DA
+-- Compare population across years
+SELECT g.year, g.geo_uid, g.geom, e.value AS pop
+FROM geo_da g
+JOIN census_economics e ON g.geo_uid = e.geo_uid AND g.year = e.year
+WHERE e.variable = 'pop_total'
+
+-- Income histogram (2021 only)
 SELECT bracket, count FROM census_income
 WHERE geo_uid = '24660101' AND income_type = 'total_income' AND sex = 'total'
-
--- % earning over $100K per DA (computed from brackets)
-SELECT g.geo_uid, g.geom,
-  SUM(CASE WHEN i.bracket IN ('$100,000-$149,999','$150,000+') THEN i.count END) * 100.0
-  / NULLIF(SUM(i.count), 0) AS pct_over_100k
-FROM geo_da g JOIN census_income i ON g.geo_uid = i.geo_uid
-WHERE i.income_type = 'total_income' AND i.sex = 'total'
-GROUP BY g.geo_uid, g.geom
 ```
 
-**CHARACTERISTIC_ID mapping — demographics** (21 five-year age groups, C1/C2/C3):
+**2021 CHARACTERISTIC_ID mapping — demographics** (21 five-year age groups, C1/C2/C3):
 ```
 10 → 0-4    14 → 15-19   20 → 45-49   26 → 70-74   31 → 90-94
 11 → 5-9    15 → 20-24   21 → 50-54   27 → 75-79   32 → 95-99
@@ -139,7 +145,10 @@ GROUP BY g.geo_uid, g.geom
              19 → 40-44
 ```
 
-**CHARACTERISTIC_ID mapping — economics** (19 variables):
+**2011 demographics** — 18 age groups matched by string Characteristic name (e.g., "0 to 4 years").
+Top bucket "85 years and over" → "85+" (2021 has four sub-buckets: 85-89, 90-94, 95-99, 100+).
+
+**2021 CHARACTERISTIC_ID mapping — economics** (19 variables):
 ```
 1    pop_total               252  avg_income_household
 4    dwellings_total         253  avg_income_aftertax_household
@@ -154,7 +163,10 @@ GROUP BY g.geo_uid, g.geom
 1529 pop_immigrant
 ```
 
-**CHARACTERISTIC_ID mapping — income** (4 distribution types, leaf brackets only):
+**2011 economics** — 5 variables only (Census Profile, no NHS):
+pop_total, dwellings_total, median_age (not avg_age), lang_mother_english, lang_mother_french.
+
+**2021 CHARACTERISTIC_ID mapping — income** (4 distribution types, leaf brackets only):
 ```
 Person total income:      156,158-167,169,170  (13 brackets, C1/C2/C3)
 Person after-tax income:  172,174-183,185,186  (13 brackets, C1/C2/C3)

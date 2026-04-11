@@ -52,10 +52,14 @@ transform_metadata <- function(.input) {
   metadata_aggregation()
 }
 
-#' Ingest DA-level census bulk CSV + boundary shapefile
+#' Ingest DA-level census bulk CSV + boundary shapefiles (2001-2021)
 #' @maestroOutputs load_census_da
 ingest_census_da <- function() {
+  census_2011_da()
   census_2021_da()
+  da_boundary_2001()
+  da_boundary_2006()
+  da_boundary_2011()
   da_boundary_2021()
 }
 
@@ -63,8 +67,10 @@ ingest_census_da <- function() {
 # LOAD PIPELINES
 # =============================================================================
 
-#' Build DA census parquet from bulk CSV + shapefile via DuckDB
+#' Build DA census parquet star schema via DuckDB (2011 + 2021, then combine)
 #' @maestroInputs ingest_census_da
 load_census_da <- function(.input) {
-  system2("bash", here::here("pipelines", "load", "src", "census_da_from_bulk.sh"))
+  system2("bash", here::here("pipelines", "load", "src", "census_da_2021.sh"))
+  system2("bash", here::here("pipelines", "load", "src", "census_da_2011.sh"))
+  system2("bash", here::here("pipelines", "load", "src", "census_da_combine.sh"))
 }

@@ -1,14 +1,15 @@
 #!/bin/bash
-# Build DA-level census star schema from StatCan bulk CSV + DA boundary shapefile.
+# Build 2021 DA-level census star schema from StatCan bulk CSV + DA boundary shapefile.
+# Writes intermediate year-specific files; census_da_combine.sh merges all years.
 #
 # Reads:
 #   - ingest/input/census_da/2021/quebec_da_2021/*_English_CSV_data_Quebec.csv
 #   - ingest/input/geo/da_boundary_2021/*.shp
 # Writes:
-#   - load/output/geo_da.parquet              (geometry layer)
-#   - load/output/census_demographics.parquet  (age × sex fact table)
-#   - load/output/census_economics.parquet     (generic measures fact table)
-#   - load/output/census_income.parquet        (income distribution fact table)
+#   - load/output/geo_da_2021.parquet
+#   - load/output/census_demographics_2021.parquet
+#   - load/output/census_economics_2021.parquet
+#   - load/output/census_income_2021.parquet
 
 set -euo pipefail
 
@@ -31,7 +32,7 @@ if [ -z "$DA_SHP" ]; then
   exit 1
 fi
 
-echo "Building star schema from bulk CSV..."
+echo "Building 2021 star schema from bulk CSV..."
 echo "  CSV: $DA_CSV"
 echo "  SHP: $DA_SHP"
 
@@ -39,10 +40,11 @@ duckdb -c "
 INSTALL spatial; LOAD spatial;
 
 -- ================================================================
--- 1. geo_da.parquet — geometry layer (one row per DA)
+-- 1. geo_da_2021.parquet — geometry layer (one row per DA)
 -- ================================================================
 COPY (
   SELECT
+    2021 AS year,
     b.DAUID    AS geo_uid,
     b.DAUID    AS da_name,
     b.LANDAREA AS area_sqkm,
@@ -57,10 +59,10 @@ COPY (
         AND CAST(CHARACTERISTIC_ID AS INT) = 1
         AND TRY_CAST(C1_COUNT_TOTAL AS DOUBLE) > 0
     )
-) TO '$OUTPUT_DIR/geo_da.parquet' (FORMAT PARQUET);
+) TO '$OUTPUT_DIR/geo_da_2021.parquet' (FORMAT PARQUET);
 
 -- ================================================================
--- 2. census_demographics.parquet — full age pyramid (long format)
+-- 2. census_demographics_2021.parquet — full age pyramid (long format)
 --    21 five-year age groups × 3 sexes per DA
 -- ================================================================
 COPY (
@@ -89,16 +91,16 @@ COPY (
       total, male, female
     FROM age_data
   )
-  SELECT geo_uid, age_group, 'total' AS sex, total AS population FROM labeled
+  SELECT 2021 AS year, geo_uid, age_group, 'total' AS sex, total AS population FROM labeled
   UNION ALL
-  SELECT geo_uid, age_group, 'male' AS sex, male AS population FROM labeled
+  SELECT 2021, geo_uid, age_group, 'male' AS sex, male AS population FROM labeled
   UNION ALL
-  SELECT geo_uid, age_group, 'female' AS sex, female AS population FROM labeled
-) TO '$OUTPUT_DIR/census_demographics.parquet' (FORMAT PARQUET);
+  SELECT 2021, geo_uid, age_group, 'female' AS sex, female AS population FROM labeled
+) TO '$OUTPUT_DIR/census_demographics_2021.parquet' (FORMAT PARQUET);
 
 -- ================================================================
--- 3. census_economics.parquet — generic measures (long format)
---    (geo_uid, variable, sex, value)
+-- 3. census_economics_2021.parquet — generic measures (long format)
+--    (year, geo_uid, variable, sex, value)
 -- ================================================================
 COPY (
   WITH raw AS (
@@ -113,74 +115,74 @@ COPY (
       AND CAST(CHARACTERISTIC_ID AS INT) IN (1,4,39,243,244,252,253,318,319,333,396,397,1415,1416,1529,340,345,355,360)
   )
   -- population & dwellings
-  SELECT geo_uid, 'pop_total' AS variable, 'total' AS sex, c1 AS value FROM raw WHERE cid = 1
+  SELECT 2021 AS year, geo_uid, 'pop_total' AS variable, 'total' AS sex, c1 AS value FROM raw WHERE cid = 1
   UNION ALL
-  SELECT geo_uid, 'dwellings_total', 'total', c1 FROM raw WHERE cid = 4
+  SELECT 2021, geo_uid, 'dwellings_total', 'total', c1 FROM raw WHERE cid = 4
   UNION ALL
-  SELECT geo_uid, 'avg_age', 'total', c1 FROM raw WHERE cid = 39
+  SELECT 2021, geo_uid, 'avg_age', 'total', c1 FROM raw WHERE cid = 39
   -- income (household — no sex split)
   UNION ALL
-  SELECT geo_uid, 'median_income_household', 'total', c1 FROM raw WHERE cid = 243
+  SELECT 2021, geo_uid, 'median_income_household', 'total', c1 FROM raw WHERE cid = 243
   UNION ALL
-  SELECT geo_uid, 'median_income_aftertax_household', 'total', c1 FROM raw WHERE cid = 244
+  SELECT 2021, geo_uid, 'median_income_aftertax_household', 'total', c1 FROM raw WHERE cid = 244
   UNION ALL
-  SELECT geo_uid, 'avg_income_household', 'total', c1 FROM raw WHERE cid = 252
+  SELECT 2021, geo_uid, 'avg_income_household', 'total', c1 FROM raw WHERE cid = 252
   UNION ALL
-  SELECT geo_uid, 'avg_income_aftertax_household', 'total', c1 FROM raw WHERE cid = 253
+  SELECT 2021, geo_uid, 'avg_income_aftertax_household', 'total', c1 FROM raw WHERE cid = 253
   -- income (person — C1=total, C2=male, C3=female)
   UNION ALL
-  SELECT geo_uid, 'median_income', 'total', c1 FROM raw WHERE cid = 318
+  SELECT 2021, geo_uid, 'median_income', 'total', c1 FROM raw WHERE cid = 318
   UNION ALL
-  SELECT geo_uid, 'median_income', 'male', c2 FROM raw WHERE cid = 318
+  SELECT 2021, geo_uid, 'median_income', 'male', c2 FROM raw WHERE cid = 318
   UNION ALL
-  SELECT geo_uid, 'median_income', 'female', c3 FROM raw WHERE cid = 318
+  SELECT 2021, geo_uid, 'median_income', 'female', c3 FROM raw WHERE cid = 318
   UNION ALL
-  SELECT geo_uid, 'median_income_aftertax', 'total', c1 FROM raw WHERE cid = 319
+  SELECT 2021, geo_uid, 'median_income_aftertax', 'total', c1 FROM raw WHERE cid = 319
   UNION ALL
-  SELECT geo_uid, 'median_income_aftertax', 'male', c2 FROM raw WHERE cid = 319
+  SELECT 2021, geo_uid, 'median_income_aftertax', 'male', c2 FROM raw WHERE cid = 319
   UNION ALL
-  SELECT geo_uid, 'median_income_aftertax', 'female', c3 FROM raw WHERE cid = 319
+  SELECT 2021, geo_uid, 'median_income_aftertax', 'female', c3 FROM raw WHERE cid = 319
   UNION ALL
-  SELECT geo_uid, 'avg_income', 'total', c1 FROM raw WHERE cid = 333
+  SELECT 2021, geo_uid, 'avg_income', 'total', c1 FROM raw WHERE cid = 333
   UNION ALL
-  SELECT geo_uid, 'avg_income', 'male', c2 FROM raw WHERE cid = 333
+  SELECT 2021, geo_uid, 'avg_income', 'male', c2 FROM raw WHERE cid = 333
   UNION ALL
-  SELECT geo_uid, 'avg_income', 'female', c3 FROM raw WHERE cid = 333
+  SELECT 2021, geo_uid, 'avg_income', 'female', c3 FROM raw WHERE cid = 333
   -- housing tenure
   UNION ALL
-  SELECT geo_uid, 'tenure_owner', 'total', c1 FROM raw WHERE cid = 1415
+  SELECT 2021, geo_uid, 'tenure_owner', 'total', c1 FROM raw WHERE cid = 1415
   UNION ALL
-  SELECT geo_uid, 'tenure_renter', 'total', c1 FROM raw WHERE cid = 1416
+  SELECT 2021, geo_uid, 'tenure_renter', 'total', c1 FROM raw WHERE cid = 1416
   -- language
   UNION ALL
-  SELECT geo_uid, 'lang_mother_english', 'total', c1 FROM raw WHERE cid = 396
+  SELECT 2021, geo_uid, 'lang_mother_english', 'total', c1 FROM raw WHERE cid = 396
   UNION ALL
-  SELECT geo_uid, 'lang_mother_french', 'total', c1 FROM raw WHERE cid = 397
+  SELECT 2021, geo_uid, 'lang_mother_french', 'total', c1 FROM raw WHERE cid = 397
   -- immigration
   UNION ALL
-  SELECT geo_uid, 'pop_immigrant', 'total', c1 FROM raw WHERE cid = 1529
+  SELECT 2021, geo_uid, 'pop_immigrant', 'total', c1 FROM raw WHERE cid = 1529
   -- low income measures
   UNION ALL
-  SELECT geo_uid, 'lim_at_count', 'total', c1 FROM raw WHERE cid = 340
+  SELECT 2021, geo_uid, 'lim_at_count', 'total', c1 FROM raw WHERE cid = 340
   UNION ALL
-  SELECT geo_uid, 'lim_at_count', 'male', c2 FROM raw WHERE cid = 340
+  SELECT 2021, geo_uid, 'lim_at_count', 'male', c2 FROM raw WHERE cid = 340
   UNION ALL
-  SELECT geo_uid, 'lim_at_count', 'female', c3 FROM raw WHERE cid = 340
+  SELECT 2021, geo_uid, 'lim_at_count', 'female', c3 FROM raw WHERE cid = 340
   UNION ALL
-  SELECT geo_uid, 'lim_at_prevalence', 'total', c1 FROM raw WHERE cid = 345
+  SELECT 2021, geo_uid, 'lim_at_prevalence', 'total', c1 FROM raw WHERE cid = 345
   UNION ALL
-  SELECT geo_uid, 'lico_at_count', 'total', c1 FROM raw WHERE cid = 355
+  SELECT 2021, geo_uid, 'lico_at_count', 'total', c1 FROM raw WHERE cid = 355
   UNION ALL
-  SELECT geo_uid, 'lico_at_count', 'male', c2 FROM raw WHERE cid = 355
+  SELECT 2021, geo_uid, 'lico_at_count', 'male', c2 FROM raw WHERE cid = 355
   UNION ALL
-  SELECT geo_uid, 'lico_at_count', 'female', c3 FROM raw WHERE cid = 355
+  SELECT 2021, geo_uid, 'lico_at_count', 'female', c3 FROM raw WHERE cid = 355
   UNION ALL
-  SELECT geo_uid, 'lico_at_prevalence', 'total', c1 FROM raw WHERE cid = 360
-) TO '$OUTPUT_DIR/census_economics.parquet' (FORMAT PARQUET);
+  SELECT 2021, geo_uid, 'lico_at_prevalence', 'total', c1 FROM raw WHERE cid = 360
+) TO '$OUTPUT_DIR/census_economics_2021.parquet' (FORMAT PARQUET);
 
 -- ================================================================
--- 4. census_income.parquet — income distribution brackets (long format)
---    (geo_uid, income_type, bracket, sex, count)
+-- 4. census_income_2021.parquet — income distribution brackets (long format)
+--    (year, geo_uid, income_type, bracket, sex, count)
 --    Person-level brackets have C1/C2/C3; household brackets C1 only.
 -- ================================================================
 COPY (
@@ -284,23 +286,23 @@ COPY (
     FROM raw
   )
   -- person-level: 3 sexes
-  SELECT geo_uid, income_type, bracket, 'total' AS sex, c1 AS count
+  SELECT 2021 AS year, geo_uid, income_type, bracket, 'total' AS sex, c1 AS count
   FROM labeled WHERE income_type IN ('total_income', 'aftertax_income')
   UNION ALL
-  SELECT geo_uid, income_type, bracket, 'male' AS sex, c2 AS count
+  SELECT 2021, geo_uid, income_type, bracket, 'male' AS sex, c2 AS count
   FROM labeled WHERE income_type IN ('total_income', 'aftertax_income')
   UNION ALL
-  SELECT geo_uid, income_type, bracket, 'female' AS sex, c3 AS count
+  SELECT 2021, geo_uid, income_type, bracket, 'female' AS sex, c3 AS count
   FROM labeled WHERE income_type IN ('total_income', 'aftertax_income')
   UNION ALL
   -- household-level: total only
-  SELECT geo_uid, income_type, bracket, 'total' AS sex, c1 AS count
+  SELECT 2021, geo_uid, income_type, bracket, 'total' AS sex, c1 AS count
   FROM labeled WHERE income_type IN ('household_total_income', 'household_aftertax_income')
-) TO '$OUTPUT_DIR/census_income.parquet' (FORMAT PARQUET);
+) TO '$OUTPUT_DIR/census_income_2021.parquet' (FORMAT PARQUET);
 "
 
-echo "Done:"
-echo "  $OUTPUT_DIR/geo_da.parquet"
-echo "  $OUTPUT_DIR/census_demographics.parquet"
-echo "  $OUTPUT_DIR/census_economics.parquet"
-echo "  $OUTPUT_DIR/census_income.parquet"
+echo "Done (2021):"
+echo "  $OUTPUT_DIR/geo_da_2021.parquet"
+echo "  $OUTPUT_DIR/census_demographics_2021.parquet"
+echo "  $OUTPUT_DIR/census_economics_2021.parquet"
+echo "  $OUTPUT_DIR/census_income_2021.parquet"

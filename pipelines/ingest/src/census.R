@@ -476,6 +476,33 @@ census_2021_by_district <- function(force = FALSE) {
 }
 
 # =============================================================================
+# 2011 Census DA-level: bulk CSV for all Quebec DAs (Census Profile).
+# ~156 MB ZIP. Different format from 2021 (string Characteristic names,
+# different column names). DuckDB queries this directly.
+# NOTE: Only Census Profile data (demographics, language, dwellings).
+#       Income/tenure/immigration were in the NHS (not available at DA).
+# =============================================================================
+CENSUS_2011_DA_URL <- "https://www12.statcan.gc.ca/census-recensement/2011/dp-pd/prof/details/download-telecharger/comprehensive/comp_download.cfm?CTLG=98-316-XWE2011001&FMT=CSV1501"
+
+census_2011_da <- function(force = FALSE) {
+  output_dir <- here("pipelines", "ingest", "input", "census_da", "2011")
+  dir_create(output_dir, recurse = TRUE)
+
+  extract_dir <- file.path(output_dir, "quebec_da_2011")
+
+  if (!dir_exists(extract_dir) || force) {
+    download_file(
+      url = CENSUS_2011_DA_URL,
+      output_path = output_dir,
+      filename = "quebec_da_2011.zip",
+      force = force
+    )
+  }
+
+  extract_dir
+}
+
+# =============================================================================
 # 2021 Census DA-level: bulk CSV for all Quebec DAs (GEONO=006).
 # ~528 MB ZIP. DuckDB queries this directly — no R extraction needed.
 # =============================================================================
