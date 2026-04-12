@@ -50,7 +50,9 @@ geo_aggregation <- function() {
   dem_file <- here("pipelines", "ingest", "input", "geo", "mt_royal_dem.tif")
   contours_path <- here("pipelines", "transform", "input", "contours.geojson")
   if (file.exists(dem_file)) {
-    system2("gdal_contour", c("-a", "elevation", "-i", "10", dem_file, contours_path, "-f", "GeoJSON"))
+    if (file.exists(contours_path)) file.remove(contours_path)
+    levels <- seq(50, 230, by = 10)
+    system2("gdal_contour", c("-a", "elevation", "-fl", levels, dem_file, contours_path, "-f", "GeoJSON"))
     message(sprintf("Wrote contours to %s", contours_path))
   } else {
     message("Skipping contours (run montreal_dem() in ingest first)")
