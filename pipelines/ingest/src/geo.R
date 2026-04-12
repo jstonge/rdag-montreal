@@ -95,10 +95,11 @@ montreal_dem <- function(force = FALSE) {
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
   # Fetch a small SRTM clip covering Mount Royal from OpenTopography
+  api_key <- Sys.getenv("OPENTOPOGRAPHY_API_KEY", unset = "demoapikeyot2022")
   url <- paste0(
     "https://portal.opentopography.org/API/globaldem?",
-    "demtype=SRTMGL1&south=45.49&north=45.52&west=-73.62&east=-73.57",
-    "&outputFormat=GTiff&API_Key=demoapikeyot2022"
+    "demtype=SRTMGL1&south=45.48&north=45.53&west=-73.63&east=-73.56",
+    "&outputFormat=GTiff&API_Key=", api_key
   )
 
   message("Fetching Mount Royal DEM from OpenTopography...")
