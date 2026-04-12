@@ -98,7 +98,7 @@ montreal_dem <- function(force = FALSE) {
   api_key <- Sys.getenv("OPENTOPOGRAPHY_API_KEY", unset = "demoapikeyot2022")
   url <- paste0(
     "https://portal.opentopography.org/API/globaldem?",
-    "demtype=SRTMGL1&south=45.48&north=45.53&west=-73.63&east=-73.56",
+    "demtype=SRTMGL1&south=45.47&north=45.53&west=-73.65&east=-73.56",
     "&outputFormat=GTiff&API_Key=", api_key
   )
 
