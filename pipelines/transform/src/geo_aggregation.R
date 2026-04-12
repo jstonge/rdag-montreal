@@ -51,7 +51,7 @@ geo_aggregation <- function() {
   contours_path <- here("pipelines", "transform", "input", "contours.geojson")
   if (file.exists(dem_file)) {
     if (file.exists(contours_path)) file.remove(contours_path)
-    levels <- seq(50, 230, by = 10)
+    levels <- seq(50, 225, by = 25)
     system2("gdal_contour", c("-a", "elevation", "-fl", levels, dem_file, contours_path, "-f", "GeoJSON"))
     message(sprintf("Wrote contours to %s", contours_path))
   } else {
